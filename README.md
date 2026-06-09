@@ -1,6 +1,6 @@
 # d3hl_infra_crew
 
-Plan-only CrewAI orchestrator for the d3HL homelab infrastructure repos.
+This Plan-only CrewAI orchestrator for the d3HL homelab infrastructure repos.
 
 This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects a Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
 
