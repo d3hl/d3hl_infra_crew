@@ -23,21 +23,9 @@ class InfrastructureCrew:
         )
 
     @agent
-    def terraform_provisioning_architect(self) -> Agent:
+    def infrastructure_provisioning_agent(self) -> Agent:
         return Agent(
-            config=self.agents_config["terraform_provisioning_architect"],  # type: ignore[index]
-        )
-
-    @agent
-    def ansible_configuration_architect(self) -> Agent:
-        return Agent(
-            config=self.agents_config["ansible_configuration_architect"],  # type: ignore[index]
-        )
-
-    @agent
-    def platform_lifecycle_specialist(self) -> Agent:
-        return Agent(
-            config=self.agents_config["platform_lifecycle_specialist"],  # type: ignore[index]
+            config=self.agents_config["infrastructure_provisioning_agent"],  # type: ignore[index]
         )
 
     @agent

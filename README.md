@@ -2,7 +2,7 @@
 
 Plan-only CrewAI orchestrator for the d3HL homelab infrastructure repos.
 
-This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request, selects a Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
+This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects a Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
 
 ## Target repos
 
@@ -55,7 +55,7 @@ UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infr
 
 The Flow writes the final handoff to `output/infrastructure_handoff.md`.
 
-For an LLM-free end-to-end dry run of the Flow and repo-state adapter:
+For an LLM-free dry run of trigger parsing, the repo-state adapter, boundary-safe handoff rendering, and output writing:
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Dry-run active feature handoff","allowed_boundary":"plan_only","dry_run":true}'

@@ -24,7 +24,7 @@ classify_infra_request:
   expected_output: >
     A classification brief naming the primary scope, secondary scopes, out-of-scope
     live actions, required inputs, and the next approval gate if any.
-  agent: platform_lifecycle_specialist
+  agent: infrastructure_provisioning_agent
 
 select_automation_path:
   description: >
@@ -43,7 +43,7 @@ select_automation_path:
     An automation-path decision with Terraform responsibilities, Ansible
     responsibilities, Bash glue if needed, rejected Python/API-wrapper options,
     and provider/module checks the implementer must perform.
-  agent: terraform_provisioning_architect
+  agent: infrastructure_provisioning_agent
 
 draft_candidate_plan:
   description: >
@@ -57,7 +57,7 @@ draft_candidate_plan:
     A markdown candidate plan with sections: Assumptions, Candidate Terraform,
     Candidate Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes,
     Validation Commands, Rollback Hints, Blockers.
-  agent: ansible_configuration_architect
+  agent: infrastructure_provisioning_agent
 
 validate_boundary:
   description: >

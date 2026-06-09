@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from crewai.flow import Flow, listen, start
 from pydantic import BaseModel, Field
@@ -26,6 +26,10 @@ class InfrastructureState(BaseModel):
 
 class InfrastructureFlow(Flow[InfrastructureState]):
     """Stateful Flow that wraps the sequential d3HL infrastructure crew."""
+
+    tracing: bool | None = False
+    suppress_flow_events: bool = True
+    _skip_auto_memory: ClassVar[bool] = True
 
     @start()
     def collect_inputs(self, crewai_trigger_payload: dict[str, Any] | None = None):
@@ -159,8 +163,42 @@ def run_with_trigger():
     except json.JSONDecodeError as exc:
         raise Exception("Invalid JSON trigger payload") from exc
 
+    if bool(trigger_payload.get("dry_run", False)):
+        target_repo = str(trigger_payload.get("target_repo", InfrastructureState().target_repo))
+        infrastructure_request = str(
+            trigger_payload.get(
+                "infrastructure_request",
+                trigger_payload.get("request", InfrastructureState().infrastructure_request),
+            )
+        )
+        allowed_boundary = str(trigger_payload.get("allowed_boundary", InfrastructureState().allowed_boundary))
+        run_static_checks = bool(trigger_payload.get("run_static_checks", False))
+        output_path = Path(str(trigger_payload.get("output_path", InfrastructureState().output_path)))
+
+        print("Collecting infrastructure crew inputs")
+        print(f"Target repo: {target_repo}")
+        print(f"Boundary: {allowed_boundary}")
+        print(f"Run static checks: {run_static_checks}")
+        print("Dry run: True")
+        print("Inspecting target repo harness state")
+        snapshot = collect_repo_state(target_repo, run_static_checks=run_static_checks)
+        print("Repo inspection complete")
+        print("Rendering deterministic dry-run handoff")
+        handoff = render_dry_run_handoff(
+            target_repo=target_repo,
+            infrastructure_request=infrastructure_request,
+            allowed_boundary=allowed_boundary,
+            repo_state=snapshot.to_prompt_json(),
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(handoff, encoding="utf-8")
+        print("Dry-run handoff complete")
+        print(f"Handoff saved to {output_path}")
+        return None
+
     flow = InfrastructureFlow()
-    return flow.kickoff({"crewai_trigger_payload": trigger_payload})
+    flow.kickoff({"crewai_trigger_payload": trigger_payload})
+    return None
 
 
 if __name__ == "__main__":

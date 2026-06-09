@@ -2,15 +2,16 @@
 
 ## Current feature
 
-`CREW-000` - passing.
+`CREW-001` - passing.
 
 ## Verified state
 
 - CrewAI Flow plus sequential infrastructure Crew implemented.
 - Repo-state adapter reads target repo harness files and git state.
+- Infrastructure provisioning agent consolidates Terraform, Ansible, Red Hat Satellite, Proxmox, and Cloudflare plan-only guidance.
 - Boundary checker blocks live mutation patterns and plaintext secret patterns under `plan_only`.
 - LLM-free dry-run path writes `output/infrastructure_handoff.md` and selected bootc `TF-001` from current repo state.
-- `./init.sh` passed after updating CrewAI to `1.14.6`.
+- `./init.sh` passed after creating `CREW-001`; the suite now has 8 unit tests.
 
 ## Boundary
 
