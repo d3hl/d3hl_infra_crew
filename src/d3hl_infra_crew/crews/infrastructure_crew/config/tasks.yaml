@@ -1,0 +1,92 @@
+discover_repo_state:
+  description: >
+    Review the provided repo state for target repo {target_repo}.
+
+    Repo state JSON:
+    {repo_state}
+
+    Confirm the active or next feature, baseline command, current git status,
+    recent commits, and any blockers. If static checks were skipped, say so
+    without implying verification passed.
+  expected_output: >
+    A concise repo-state brief with target repo, active feature, baseline command,
+    git status, recent commits summary, blockers, and verification status.
+  agent: repo_state_analyst
+
+classify_infra_request:
+  description: >
+    Classify this infrastructure request for target repo {target_repo}:
+    {infrastructure_request}
+
+    Split the request into provisioning, configuration, lifecycle, DNS/tunnel,
+    validation, documentation, or repo-harness scope. Preserve the allowed
+    boundary: {allowed_boundary}.
+  expected_output: >
+    A classification brief naming the primary scope, secondary scopes, out-of-scope
+    live actions, required inputs, and the next approval gate if any.
+  agent: platform_lifecycle_specialist
+
+select_automation_path:
+  description: >
+    Select the automation path for the classified request.
+
+    Mandatory rules:
+    - Use HCP Terraform for provisioning, VM creation, Proxmox resources,
+      Cloudflare resources, DNS records, tunnels, and network provisioning.
+    - Use Ansible for OS configuration, package installation, users, services,
+      application deployment, validation, and day-2 operations.
+    - Use Bash only as glue around Terraform or Ansible.
+    - Do not suggest Python when a Terraform provider or Ansible module exists.
+    - Keep Red Hat Satellite, Proxmox, Cloudflare, and registry operations
+      plan-only unless the boundary is explicitly elevated.
+  expected_output: >
+    An automation-path decision with Terraform responsibilities, Ansible
+    responsibilities, Bash glue if needed, rejected Python/API-wrapper options,
+    and provider/module checks the implementer must perform.
+  agent: terraform_provisioning_architect
+
+draft_candidate_plan:
+  description: >
+    Draft a plan-only candidate implementation for {infrastructure_request}.
+
+    Include file-level changes, expected Terraform layout, expected Ansible layout,
+    Satellite lifecycle notes, Proxmox notes, optional Cloudflare notes, validation
+    commands, rollback hints, and blockers. Do not include live apply commands,
+    plaintext secrets, or target-repo state updates as if they already happened.
+  expected_output: >
+    A markdown candidate plan with sections: Assumptions, Candidate Terraform,
+    Candidate Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes,
+    Validation Commands, Rollback Hints, Blockers.
+  agent: ansible_configuration_architect
+
+validate_boundary:
+  description: >
+    Validate the candidate plan against allowed boundary {allowed_boundary} and
+    the d3HL shared contract.
+
+    Check for:
+    - live mutation hidden in validation commands
+    - terraform apply/destroy or equivalent commands under plan_only
+    - Proxmox/Satellite/Cloudflare/registry mutation under plan_only
+    - plaintext secret values
+    - claims that target repo feature state was updated when it was not
+    - Python/custom API wrappers where Terraform or Ansible should be used
+  expected_output: >
+    A QA review with pass/fail, findings, required corrections, and final allowed
+    next action. If the output fails, provide corrected wording.
+  agent: qa_contract_guardian
+
+produce_handoff:
+  description: >
+    Produce the final handoff for target repo {target_repo} and request:
+    {infrastructure_request}
+
+    The final answer must be plan-only under {allowed_boundary}. It must include
+    assumptions, candidate config plan, validation commands, rollback hints,
+    blockers, and the next repo-specific action. Do not claim target repo files
+    were changed. Do not include plaintext secrets.
+  expected_output: >
+    Final markdown handoff with these sections: Summary, Assumptions, Candidate
+    Config, Validation Commands, Rollback Hints, Blockers, Next Action.
+  agent: qa_contract_guardian
+  output_file: output/infrastructure_handoff.md

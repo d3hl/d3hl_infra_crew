@@ -1,0 +1,23 @@
+[project]
+name = "d3hl_infra_crew"
+version = "0.1.0"
+description = "Plan-only CrewAI infrastructure crew for d3HL homelab repos"
+authors = [{ name = "d3HL", email = "ops@example.invalid" }]
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai==1.14.6",
+    "pyyaml>=6.0.0",
+]
+
+[project.scripts]
+kickoff = "d3hl_infra_crew.main:kickoff"
+run_crew = "d3hl_infra_crew.main:kickoff"
+plot = "d3hl_infra_crew.main:plot"
+run_with_trigger = "d3hl_infra_crew.main:run_with_trigger"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "flow"

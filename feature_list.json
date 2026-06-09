@@ -1,0 +1,33 @@
+{
+  "project": "d3hl_infra_crew",
+  "last_updated": "2026-06-09",
+  "rules": {
+    "single_active_feature": true,
+    "passing_requires_evidence": true,
+    "do_not_skip_verification": true,
+    "default_authority": "plan_only"
+  },
+  "features": [
+    {
+      "id": "CREW-000",
+      "priority": 1,
+      "area": "harness",
+      "title": "Create CrewAI infrastructure orchestrator baseline",
+      "description": "Scaffold a CrewAI Flow with one sequential infrastructure crew, repo-state adapters, plan-only boundary enforcement, and local static tests.",
+      "dependencies": [],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "CrewAI YAML files parse",
+        "repo-state adapter fixture tests pass",
+        "boundary tests block live mutation under plan_only"
+      ],
+      "evidence": [
+        "2026-06-09 ./init.sh passed from /home/d3/Github/d3hl_infra_crew: required harness files present, feature_list.json valid, Python compile passed, 7 unit tests passed, and git diff --check completed.",
+        "2026-06-09 LLM-free Flow dry run passed: uv run run_with_trigger with target_repo=bootc, allowed_boundary=plan_only, dry_run=true inspected the bootc repo and wrote output/infrastructure_handoff.md selecting TF-001 as the next feature without changing target repo files.",
+        "2026-06-09 CrewAI dependency pin updated from generated 1.14.5a2 alpha to current 1.14.6; ./init.sh passed after lockfile refresh."
+      ],
+      "notes": "CREW-000 complete. Runtime lives in this repo. Target repos remain authoritative. Normal Crew runs require an LLM provider key; dry_run=true verifies Flow/adapters/output without an LLM key."
+    }
+  ]
+}
