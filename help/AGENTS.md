@@ -372,10 +372,14 @@ from crewai import LLM
 agent = Agent(llm="openai/gpt-4o", ...)
 
 # Full configuration with crewai.LLM
+#llm = LLM(
+  #  model="anthropic/claude-sonnet-4-20250514",
+  ##  max_tokens=4000,
+#
 llm = LLM(
-    model="anthropic/claude-sonnet-4-20250514",
-    temperature=0.7,
-    max_tokens=4000,
+    model="openrouter/deepseek/deepseek-r1",
+    base_url="https://openrouter.ai/api/v1",
+    api_key=OPENROUTER_API_KEY
 )
 agent = Agent(llm=llm, ...)
 
