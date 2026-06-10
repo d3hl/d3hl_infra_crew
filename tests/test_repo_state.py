@@ -2,9 +2,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from d3hl_infra_crew.repo_state import collect_repo_state, select_active_feature
+from d3hl_infra_crew.tools.repo_tools import RepoStateTool
 
 
 class RepoStateTests(unittest.TestCase):
@@ -44,6 +45,13 @@ class RepoStateTests(unittest.TestCase):
             self.assertEqual(snapshot.active_feature.id, "F-1")
             self.assertEqual(snapshot.baseline_command, "./init.sh")
             self.assertNotIn("target repo has no", "\n".join(snapshot.blockers))
+
+    def test_repo_state_tool_does_not_run_static_checks_from_agent_input(self):
+        snapshot = Mock()
+        snapshot.to_prompt_json.return_value = "{}"
+        with patch("d3hl_infra_crew.tools.repo_tools.collect_repo_state", return_value=snapshot) as collect:
+            self.assertEqual(RepoStateTool()._run("bootc", run_static_checks=True), "{}")
+        collect.assert_called_once_with("bootc", run_static_checks=False)
 
 
 if __name__ == "__main__":

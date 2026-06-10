@@ -11,7 +11,13 @@ from d3hl_infra_crew.repo_state import collect_repo_state
 
 class RepoStateInput(BaseModel):
     target_repo: str = Field(..., description="Repo alias or absolute path under /home/d3/Github.")
-    run_static_checks: bool = Field(False, description="Run target repo ./init.sh when explicitly approved.")
+    run_static_checks: bool = Field(
+        False,
+        description=(
+            "Ignored for agent safety. Target repo ./init.sh can only be run by "
+            "the Flow-controlled pre-inspection path after explicit approval."
+        ),
+    )
 
 
 class RepoStateTool(BaseTool):
@@ -20,7 +26,7 @@ class RepoStateTool(BaseTool):
     args_schema: Type[BaseModel] = RepoStateInput
 
     def _run(self, target_repo: str, run_static_checks: bool = False) -> str:
-        return collect_repo_state(target_repo, run_static_checks=run_static_checks).to_prompt_json()
+        return collect_repo_state(target_repo, run_static_checks=False).to_prompt_json()
 
 
 class BoundaryInput(BaseModel):
