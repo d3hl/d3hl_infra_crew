@@ -29,6 +29,19 @@ class YamlConfigTests(unittest.TestCase):
         for task_name in ("classify_infra_request", "select_automation_path", "draft_candidate_plan"):
             self.assertEqual(tasks[task_name]["agent"], "infrastructure_provisioning_agent")
 
+    def test_hcp_terraform_context_is_referenced_by_planning_tasks(self):
+        root = Path(__file__).resolve().parents[1]
+        config_dir = root / "src" / "d3hl_infra_crew" / "crews" / "infrastructure_crew" / "config"
+        tasks = yaml.safe_load((config_dir / "tasks.yaml").read_text(encoding="utf-8"))
+        for task_name in (
+            "classify_infra_request",
+            "select_automation_path",
+            "draft_candidate_plan",
+            "validate_boundary",
+            "produce_handoff",
+        ):
+            self.assertIn("{hcp_terraform_context}", tasks[task_name]["description"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from d3hl_infra_crew.crews.infrastructure_crew.infrastructure_crew import InfrastructureCrew
 from d3hl_infra_crew.boundary import evaluate_boundary
+from d3hl_infra_crew.hcp_terraform import hcp_terraform_support_context
 from d3hl_infra_crew.repo_state import collect_repo_state
 
 
@@ -19,6 +20,7 @@ class InfrastructureState(BaseModel):
     allowed_boundary: str = "plan_only"
     run_static_checks: bool = False
     repo_state: str = ""
+    hcp_terraform_context: str = Field(default_factory=hcp_terraform_support_context)
     final_handoff: str = ""
     output_path: str = Field(default="output/infrastructure_handoff.md")
     dry_run: bool = False
@@ -66,6 +68,7 @@ class InfrastructureFlow(Flow[InfrastructureState]):
                 infrastructure_request=self.state.infrastructure_request,
                 allowed_boundary=self.state.allowed_boundary,
                 repo_state=self.state.repo_state,
+                hcp_terraform_context=self.state.hcp_terraform_context,
             )
             print("Dry-run handoff complete")
             return
@@ -77,6 +80,7 @@ class InfrastructureFlow(Flow[InfrastructureState]):
                 "infrastructure_request": self.state.infrastructure_request,
                 "allowed_boundary": self.state.allowed_boundary,
                 "repo_state": self.state.repo_state,
+                "hcp_terraform_context": self.state.hcp_terraform_context,
             }
         )
         self.state.final_handoff = result.raw
@@ -95,6 +99,7 @@ def render_dry_run_handoff(
     infrastructure_request: str,
     allowed_boundary: str,
     repo_state: str,
+    hcp_terraform_context: str | None = None,
 ) -> str:
     state = json.loads(repo_state)
     active_feature = state.get("active_feature") or {}
@@ -103,6 +108,7 @@ def render_dry_run_handoff(
     verification_status = "static checks were not requested"
     if static_check:
         verification_status = f"static check return code: {static_check.get('returncode')}"
+    hcp_context = hcp_terraform_context or hcp_terraform_support_context()
 
     handoff = f"""# Infrastructure Handoff Dry Run
 
@@ -113,13 +119,16 @@ Plan-only dry run for `{target_repo}`. Request: {infrastructure_request}
 - Allowed boundary is `{allowed_boundary}`.
 - Target repo remains authoritative for its own harness files and infrastructure code.
 - No target repo files were changed by this dry run.
-- No live Proxmox, Satellite, Cloudflare, registry, or network mutation was attempted.
+- No live HCP Terraform, Proxmox, Satellite, Cloudflare, registry, or network mutation was attempted.
 
 ## Candidate Config
-- Terraform remains the provisioning path for infrastructure, VM, DNS, tunnel, Cloudflare, and Proxmox-resource planning.
+- HCP Terraform remains the provisioning path for infrastructure, VM, DNS, tunnel, Cloudflare, and Proxmox-resource planning.
 - Ansible remains the configuration and validation path for OS, packages, services, day-2 operations, and Satellite-adjacent lifecycle orchestration.
 - Bash is limited to wrapper/glue commands.
 - Python/custom API wrappers are rejected when Terraform providers or Ansible modules can express the work.
+
+## HCP Terraform Support
+{hcp_context}
 
 ## Validation Commands
 - Local orchestrator baseline: `./init.sh` from `/home/d3/Github/d3hl_infra_crew`.
@@ -189,6 +198,7 @@ def run_with_trigger():
             infrastructure_request=infrastructure_request,
             allowed_boundary=allowed_boundary,
             repo_state=snapshot.to_prompt_json(),
+            hcp_terraform_context=hcp_terraform_support_context(),
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(handoff, encoding="utf-8")

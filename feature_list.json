@@ -1,6 +1,6 @@
 {
   "project": "d3hl_infra_crew",
-  "last_updated": "2026-06-09",
+  "last_updated": "2026-06-12",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -52,6 +52,29 @@
         "2026-06-09 boundary check passed on output/infrastructure_handoff.md with no findings."
       ],
       "notes": "The consolidated agent has no RepoStateTool or BoundaryPolicyTool. Repo inspection remains with repo_state_analyst and final boundary enforcement remains with qa_contract_guardian. Dry-run execution uses a deterministic trigger path to avoid LLM and CrewAI event-loop startup."
+    },
+    {
+      "id": "CREW-002",
+      "priority": 3,
+      "area": "terraform",
+      "title": "Add HCP Terraform plan-generation support",
+      "description": "Add first-class HCP Terraform support context to normal Crew runs and deterministic dry runs while preserving plan_only and avoiding live HCP Terraform calls.",
+      "dependencies": [
+        "CREW-001"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "Unit tests verify HCP Terraform support appears in dry-run handoffs",
+        "Boundary tests block credentialed Terraform login and plan commands under plan_only",
+        "LLM-free dry run writes output/infrastructure_handoff.md with HCP Terraform guidance and no boundary findings"
+      ],
+      "evidence": [
+        "2026-06-12 ./init.sh passed from /home/d3/Github/d3hl_infra_crew after HCP Terraform support updates: required files present, feature_list.json valid, Python compile passed, 20 unit tests passed, and git diff --check completed.",
+        "2026-06-12 dry run passed: UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger with target_repo=bootc, allowed_boundary=plan_only, dry_run=true, and request='Dry-run HCP Terraform support validation' wrote output/infrastructure_handoff.md with HCP Terraform guidance and selected bootc TF-001.",
+        "2026-06-12 boundary check passed on output/infrastructure_handoff.md with no findings."
+      ],
+      "notes": "Support is orchestrator-only. Target repos remain unchanged. HCP Terraform credential setup, remote/speculative runs, saved plans, and applies stay gated outside the default plan_only boundary."
     }
   ]
 }

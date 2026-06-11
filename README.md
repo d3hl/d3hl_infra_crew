@@ -2,7 +2,7 @@
 
 This Plan-only CrewAI orchestrator for the d3HL homelab infrastructure repos.
 
-This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects a Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
+This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects an HCP Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
 
 ## Target repos
 
@@ -24,13 +24,14 @@ Default authority is `plan_only`.
 Allowed by default:
 
 - Read target repo files and git state.
-- Generate plan-only Terraform and Ansible guidance.
+- Generate plan-only HCP Terraform and Ansible guidance.
 - Save local output under `output/`.
 
 Explicitly gated:
 
 - Target repo `./init.sh` execution.
-- Credentialed `terraform plan` or Ansible check mode.
+- HCP Terraform credential setup, remote/speculative runs, or saved plans.
+- Credentialed Terraform or Ansible check mode.
 - Live reads from Proxmox, Satellite, Cloudflare, registries, or network devices.
 
 Not default:
@@ -38,6 +39,17 @@ Not default:
 - `terraform apply`.
 - Live Proxmox, Satellite, registry, DNS, tunnel, or network mutation.
 - Plaintext secrets.
+
+## HCP Terraform support
+
+Generated handoffs include HCP Terraform planning guidance without contacting HCP Terraform. The shared support context covers:
+
+- `terraform { cloud { ... } }` for HCP Terraform remote state and execution, not a backend block.
+- Explicit organization, project, and workspace naming with placeholders until target repos record approved names.
+- Workspace variables and variable sets for provider credentials and deployment inputs.
+- No token values in Terraform files, prompts, generated handoffs, or repo state.
+- `.terraformignore` recommendations for CLI-driven uploads.
+- Static validation only under `plan_only`; credentialed HCP remote runs require explicit approval.
 
 ## Run
 

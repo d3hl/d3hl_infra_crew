@@ -18,6 +18,9 @@ classify_infra_request:
     Classify this infrastructure request for target repo {target_repo}:
     {infrastructure_request}
 
+    HCP Terraform support context:
+    {hcp_terraform_context}
+
     Split the request into provisioning, configuration, lifecycle, DNS/tunnel,
     validation, documentation, or repo-harness scope. Preserve the allowed
     boundary: {allowed_boundary}.
@@ -29,6 +32,9 @@ classify_infra_request:
 select_automation_path:
   description: >
     Select the automation path for the classified request.
+
+    HCP Terraform support context:
+    {hcp_terraform_context}
 
     Mandatory rules:
     - Use HCP Terraform for provisioning, VM creation, Proxmox resources,
@@ -49,6 +55,9 @@ draft_candidate_plan:
   description: >
     Draft a plan-only candidate implementation for {infrastructure_request}.
 
+    HCP Terraform support context:
+    {hcp_terraform_context}
+
     Include file-level changes, expected Terraform layout, expected Ansible layout,
     Satellite lifecycle notes, Proxmox notes, optional Cloudflare notes, validation
     commands, rollback hints, and blockers. Do not include live apply commands,
@@ -63,6 +72,9 @@ validate_boundary:
   description: >
     Validate the candidate plan against allowed boundary {allowed_boundary} and
     the d3HL shared contract.
+
+    HCP Terraform support context:
+    {hcp_terraform_context}
 
     Check for:
     - live mutation hidden in validation commands
@@ -80,6 +92,9 @@ produce_handoff:
   description: >
     Produce the final handoff for target repo {target_repo} and request:
     {infrastructure_request}
+
+    HCP Terraform support context:
+    {hcp_terraform_context}
 
     The final answer must be plan-only under {allowed_boundary}. It must include
     assumptions, candidate config plan, validation commands, rollback hints,

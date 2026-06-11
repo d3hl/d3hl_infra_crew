@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 
 LIVE_MUTATION_PATTERNS = [
+    r"\bterraform\s+login\b",
+    r"\bterraform(?:\s+-chdir=\S+)?\s+plan\b",
     r"\bterraform\s+apply\b",
     r"\bterraform\s+destroy\b",
     r"\btofu\s+apply\b",

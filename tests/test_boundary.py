@@ -9,6 +9,23 @@ class BoundaryTests(unittest.TestCase):
         self.assertFalse(check.passed)
         self.assertTrue(any("terraform" in finding for finding in check.findings))
 
+    def test_blocks_terraform_login_under_plan_only(self):
+        check = evaluate_boundary("Run terraform login before remote operations", "plan_only")
+        self.assertFalse(check.passed)
+        self.assertTrue(any("terraform" in finding for finding in check.findings))
+
+    def test_blocks_terraform_plan_under_plan_only(self):
+        check = evaluate_boundary("Run terraform plan to queue the remote run", "plan_only")
+        self.assertFalse(check.passed)
+        self.assertTrue(any("terraform" in finding for finding in check.findings))
+
+    def test_allows_static_terraform_validation_under_plan_only(self):
+        check = evaluate_boundary(
+            "Run terraform fmt -check -recursive and terraform -chdir=terraform/environments/dev validate",
+            "plan_only",
+        )
+        self.assertTrue(check.passed)
+
     def test_allows_op_secret_reference(self):
         check = evaluate_boundary("Use op://d3HLPRV/proxmox_env/PROXMOX_API_TOKEN as a reference only", "plan_only")
         self.assertTrue(check.passed)
