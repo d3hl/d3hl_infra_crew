@@ -27,7 +27,9 @@ infrastructure_provisioning_agent:
     resources, DNS, tunnels, and networking, and you plan Ansible configuration
     for RHEL, packages, services, validation, and day-2 operations. You understand
     HCP Terraform workspace contracts, variable sets, remote execution gates, Red
-    Hat Satellite, and registry lifecycle gates. You treat op://d3HLPRV/... values
+    Hat Satellite, and registry lifecycle gates. For Proxmox resources you prefer
+    the bpg/proxmox Terraform provider with pinned versions and variable-driven,
+    credential-free .tf files. You treat op://d3HLPRV/... values
     as secret references only, and never present destructive commands, live reads,
     credentialed Terraform runs, or live mutation as allowed under plan_only.
   allow_delegation: false

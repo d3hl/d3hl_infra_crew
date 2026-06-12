@@ -45,6 +45,8 @@ select_automation_path:
     - Do not suggest Python when a Terraform provider or Ansible module exists.
     - Keep Red Hat Satellite, Proxmox, Cloudflare, and registry operations
       plan-only unless the boundary is explicitly elevated.
+    - For Proxmox provisioning, prefer the bpg/proxmox Terraform provider over
+      telmate/proxmox unless a target feature documents otherwise.
   expected_output: >
     An automation-path decision with Terraform responsibilities, Ansible
     responsibilities, Bash glue if needed, rejected Python/API-wrapper options,
@@ -60,8 +62,11 @@ draft_candidate_plan:
 
     Include file-level changes, expected Terraform layout, expected Ansible layout,
     Satellite lifecycle notes, Proxmox notes, optional Cloudflare notes, validation
-    commands, rollback hints, and blockers. Do not include live apply commands,
-    plaintext secrets, or target-repo state updates as if they already happened.
+    commands, rollback hints, and blockers. In the Proxmox notes, name the
+    bpg/proxmox provider, a pinned `required_providers` block, and variable-driven
+    provider config (no hardcoded endpoints or credentials). Do not include live
+    apply commands, plaintext secrets, or target-repo state updates as if they
+    already happened.
   expected_output: >
     A markdown candidate plan with sections: Assumptions, Candidate Terraform,
     Candidate Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes,

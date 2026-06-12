@@ -123,6 +123,7 @@ Plan-only dry run for `{target_repo}`. Request: {infrastructure_request}
 
 ## Candidate Config
 - HCP Terraform remains the provisioning path for infrastructure, VM, DNS, tunnel, Cloudflare, and Proxmox-resource planning.
+- For Proxmox provisioning the preferred Terraform provider is `bpg/proxmox` (pinned in `required_providers`), configured through variables and workspace variable sets rather than hardcoded credentials.
 - Ansible remains the configuration and validation path for OS, packages, services, day-2 operations, and Satellite-adjacent lifecycle orchestration.
 - Bash is limited to wrapper/glue commands.
 - Python/custom API wrappers are rejected when Terraform providers or Ansible modules can express the work.

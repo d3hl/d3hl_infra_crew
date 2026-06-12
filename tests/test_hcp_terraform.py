@@ -11,6 +11,11 @@ class HcpTerraformTests(unittest.TestCase):
         check = evaluate_boundary(hcp_terraform_support_context(), "plan_only")
         self.assertTrue(check.passed, check.findings)
 
+    def test_support_context_prefers_bpg_proxmox_provider(self):
+        context = hcp_terraform_support_context()
+        self.assertIn("bpg/proxmox", context)
+        self.assertTrue(evaluate_boundary(context, "plan_only").passed)
+
     def test_dry_run_handoff_includes_hcp_terraform_guidance(self):
         repo_state = {
             "active_feature": {
@@ -31,6 +36,7 @@ class HcpTerraformTests(unittest.TestCase):
         self.assertIn("organization, project, and workspace naming", handoff)
         self.assertIn("workspace environment variables or variable sets", handoff)
         self.assertIn(".terraformignore", handoff)
+        self.assertIn("bpg/proxmox", handoff)
         self.assertIn("TF-001", handoff)
         self.assertTrue(evaluate_boundary(handoff, "plan_only").passed)
 

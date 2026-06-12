@@ -10,6 +10,21 @@ HCP_TERRAFORM_SUPPORT_CONTEXT = """HCP Terraform support context:
 - Default validation remains local static validation only: formatting checks and backend-disabled initialization/validation where target repos define Terraform files.
 """
 
+TERRAFORM_PROVIDER_PREFERENCES = """Terraform provider preferences:
+- For Proxmox resources, prefer the `bpg/proxmox` provider (registry source `bpg/proxmox`) over `telmate/proxmox` unless a target feature documents otherwise.
+- Pin providers pessimistically in a `required_providers` block (e.g. `version = "~> 0.x"`); the target repo records the exact approved version.
+- Drive the provider endpoint and credentials through Terraform variables and HCP Terraform workspace variable sets. Never hardcode endpoints, API tokens, or `op://` values in `.tf` files.
+- Example shape (no credentials in repo):
+    terraform {
+      required_providers {
+        proxmox = {
+          source  = "bpg/proxmox"
+          version = "~> 0.x"
+        }
+      }
+    }
+"""
+
 
 def hcp_terraform_support_context() -> str:
-    return HCP_TERRAFORM_SUPPORT_CONTEXT
+    return HCP_TERRAFORM_SUPPORT_CONTEXT + "\n" + TERRAFORM_PROVIDER_PREFERENCES

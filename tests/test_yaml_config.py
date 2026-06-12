@@ -42,6 +42,13 @@ class YamlConfigTests(unittest.TestCase):
         ):
             self.assertIn("{hcp_terraform_context}", tasks[task_name]["description"])
 
+    def test_planning_tasks_prefer_bpg_proxmox_provider(self):
+        root = Path(__file__).resolve().parents[1]
+        config_dir = root / "src" / "d3hl_infra_crew" / "crews" / "infrastructure_crew" / "config"
+        tasks = yaml.safe_load((config_dir / "tasks.yaml").read_text(encoding="utf-8"))
+        for task_name in ("select_automation_path", "draft_candidate_plan"):
+            self.assertIn("bpg/proxmox", tasks[task_name]["description"], task_name)
+
 
 if __name__ == "__main__":
     unittest.main()
