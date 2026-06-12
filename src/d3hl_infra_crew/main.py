@@ -109,14 +109,43 @@ def render_dry_run_handoff(
     if static_check:
         verification_status = f"static check return code: {static_check.get('returncode')}"
     hcp_context = hcp_terraform_context or hcp_terraform_support_context()
+    normalized_boundary = allowed_boundary.lower().strip()
+    if normalized_boundary == "live_read_check":
+        boundary_summary = (
+            "Approved read/check stage: live reads, credential setup, credentialed Terraform plan runs, "
+            "and Ansible --check are allowed only after explicit approval; mutation remains blocked."
+        )
+        next_action_scope = "keep the next action within approved read/check scope unless the user explicitly approves a higher boundary"
+        validation_scope = (
+            "- Read/check live-stage actions may include approved live reads, `terraform login`, "
+            "`terraform plan`, and `ansible-playbook --check`.\n"
+            "- Mutation remains blocked: Terraform mutation/destruction equivalents, Proxmox mutation, "
+            "registry pushes, Cloudflare changes, and Satellite lifecycle changes."
+        )
+    else:
+        boundary_summary = (
+            "Plan-only stage: generate guidance and local output only; credentialed live reads, "
+            "remote Terraform runs, and Ansible execution stay behind a later approval gate."
+        )
+        next_action_scope = "keep the next action plan-only unless the user explicitly approves a higher boundary"
+        validation_scope = (
+            "- Local orchestrator baseline: `./init.sh` from `/home/d3/Github/d3hl_infra_crew`.\n"
+            "- Target baseline command: `{baseline_command}` from `{target_path}`.\n"
+            "- Target verification status in this run: {verification_status}."
+        ).format(
+            baseline_command=state.get("baseline_command") or "not available",
+            target_path=state.get("path"),
+            verification_status=verification_status,
+        )
 
     handoff = f"""# Infrastructure Handoff Dry Run
 
 ## Summary
-Plan-only dry run for `{target_repo}`. Request: {infrastructure_request}
+Infrastructure dry run for `{target_repo}`. Request: {infrastructure_request}
 
 ## Assumptions
 - Allowed boundary is `{allowed_boundary}`.
+- Boundary scope: {boundary_summary}
 - Target repo remains authoritative for its own harness files and infrastructure code.
 - No target repo files were changed by this dry run.
 - No live HCP Terraform, Proxmox, Satellite, Cloudflare, registry, or network mutation was attempted.
@@ -132,9 +161,7 @@ Plan-only dry run for `{target_repo}`. Request: {infrastructure_request}
 {hcp_context}
 
 ## Validation Commands
-- Local orchestrator baseline: `./init.sh` from `/home/d3/Github/d3hl_infra_crew`.
-- Target baseline command: `{state.get('baseline_command') or 'not available'}` from `{state.get('path')}`.
-- Target verification status in this run: {verification_status}.
+{validation_scope}
 
 ## Rollback Hints
 - Delete local generated output under `output/` if the dry-run handoff is not needed.
@@ -144,7 +171,7 @@ Plan-only dry run for `{target_repo}`. Request: {infrastructure_request}
 {chr(10).join(f'- {blocker}' for blocker in blockers) if blockers else '- None from repo-state adapter.'}
 
 ## Next Action
-Start from feature `{active_feature.get('id', 'unknown')}` ({active_feature.get('title', 'unknown')}) in `{target_repo}` and keep the next action plan-only unless the user explicitly approves a higher boundary.
+Start from feature `{active_feature.get('id', 'unknown')}` ({active_feature.get('title', 'unknown')}) in `{target_repo}` and {next_action_scope}.
 """
     boundary = evaluate_boundary(handoff, allowed_boundary=allowed_boundary)
     if not boundary.passed:

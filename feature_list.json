@@ -1,6 +1,6 @@
 {
   "project": "d3hl_infra_crew",
-  "last_updated": "2026-06-12",
+  "last_updated": "2026-06-13",
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
@@ -75,6 +75,29 @@
         "2026-06-12 boundary check passed on output/infrastructure_handoff.md with no findings."
       ],
       "notes": "Support is orchestrator-only. Target repos remain unchanged. HCP Terraform credential setup, remote/speculative runs, saved plans, and applies stay gated outside the default plan_only boundary."
+    },
+    {
+      "id": "CREW-003",
+      "priority": 4,
+      "area": "boundary",
+      "title": "Add read/check live-stage boundary",
+      "description": "Add live_read_check as the first approval-gated live stage for live reads, target repo static checks, credentialed Terraform plans, and Ansible check mode while preserving plan_only as the default and blocking mutation.",
+      "dependencies": [
+        "CREW-002"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "Boundary tests prove Terraform plan is blocked under plan_only and allowed under live_read_check",
+        "Boundary tests prove Terraform mutation, mutating Ansible without check mode, and plaintext secrets remain blocked",
+        "LLM-free dry run writes output/infrastructure_handoff.md with allowed_boundary=live_read_check and no boundary findings"
+      ],
+      "evidence": [
+        "2026-06-13 focused tests passed for tests.test_boundary, tests.test_hcp_terraform, and tests.test_llm_config with UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy.",
+        "2026-06-13 ./init.sh passed from /home/d3/Github/d3hl_infra_crew after live_read_check updates: required files present, feature_list.json valid, Python compile passed, 28 unit tests passed, and git diff --check completed.",
+        "2026-06-13 dry run passed: UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger with target_repo=bootc, allowed_boundary=live_read_check, dry_run=true, and request='Read/check live-stage validation' wrote output/infrastructure_handoff.md with no boundary findings."
+      ],
+      "notes": "live_read_check is read/check only. It does not permit Terraform apply/destroy, Proxmox mutation, registry push, Cloudflare or Satellite mutation, target repo state closeout, or plaintext secrets."
     }
   ]
 }

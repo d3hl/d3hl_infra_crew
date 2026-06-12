@@ -49,6 +49,15 @@ class YamlConfigTests(unittest.TestCase):
         for task_name in ("select_automation_path", "draft_candidate_plan"):
             self.assertIn("bpg/proxmox", tasks[task_name]["description"], task_name)
 
+    def test_tasks_describe_live_read_check_boundary(self):
+        root = Path(__file__).resolve().parents[1]
+        config_dir = root / "src" / "d3hl_infra_crew" / "crews" / "infrastructure_crew" / "config"
+        agents = yaml.safe_load((config_dir / "agents.yaml").read_text(encoding="utf-8"))
+        tasks = yaml.safe_load((config_dir / "tasks.yaml").read_text(encoding="utf-8"))
+        self.assertIn("live_read_check", agents["infrastructure_provisioning_agent"]["backstory"])
+        for task_name in ("classify_infra_request", "select_automation_path", "produce_handoff"):
+            self.assertIn("live_read_check", tasks[task_name]["description"], task_name)
+
 
 if __name__ == "__main__":
     unittest.main()

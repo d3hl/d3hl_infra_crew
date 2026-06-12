@@ -9,7 +9,7 @@ from crewai.project import CrewBase, agent, crew, task
 from d3hl_infra_crew.tools import BoundaryPolicyTool, RepoStateTool
 
 
-DEFAULT_OPENROUTER_MODEL = "openrouter/deepseek/deepseek-r1"
+DEFAULT_OPENROUTER_MODEL = "openrouter/deepseek/deepseek-v4-pro"
 DEFAULT_MAX_TOKENS = 4096
 
 

@@ -14,6 +14,11 @@ Default authority is `plan_only`. This is the central design constraint, enforce
 - **Gated (needs explicit user approval)**: running a *target* repo's `./init.sh` (the `run_static_checks` flag in the trigger payload), credentialed `terraform plan` / Ansible check mode, live reads against Proxmox / Satellite / Cloudflare / registries / network devices.
 - **Never by default**: `terraform apply`/`destroy`, any live infra mutation, plaintext secrets. `op://d3HLPRV/...` strings are kept as references only — never resolve them.
 
+Supported `allowed_boundary` values:
+
+- `plan_only`: default guidance/output mode. Blocks credentialed Terraform planning, Ansible execution other than static syntax checks, live reads, and all mutation.
+- `live_read_check`: first live stage. Allows approved live reads, credential setup, credentialed Terraform planning, and Ansible `--check`; still blocks mutation, pushes, lifecycle changes, and target repo state closeout.
+
 `evaluate_boundary()` scans generated text for live-mutation command patterns and plaintext-secret patterns; a failing check appends "Boundary Findings" to the handoff rather than blocking the write. Do not weaken these patterns to make output pass.
 
 ## Commands
@@ -42,6 +47,9 @@ uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","
 
 # LLM-free dry run — exercises trigger parsing, repo-state adapter, handoff render, boundary check, output write
 uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","allowed_boundary":"plan_only","dry_run":true}'
+
+# LLM-free read/check-stage dry run after approval
+uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'
 ```
 
 `dry_run:true` is the primary way to verify changes without an LLM key. It takes a deterministic code path in `run_with_trigger` (see below) that never starts the CrewAI event loop.

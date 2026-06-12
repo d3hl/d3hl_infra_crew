@@ -23,10 +23,12 @@ classify_infra_request:
 
     Split the request into provisioning, configuration, lifecycle, DNS/tunnel,
     validation, documentation, or repo-harness scope. Preserve the allowed
-    boundary: {allowed_boundary}.
+    boundary: {allowed_boundary}. Supported boundaries are `plan_only` and
+    `live_read_check`; do not invent a mutation boundary.
   expected_output: >
     A classification brief naming the primary scope, secondary scopes, out-of-scope
-    live actions, required inputs, and the next approval gate if any.
+    live actions, required inputs, whether read/check actions are allowed, and
+    the next approval gate if any.
   agent: infrastructure_provisioning_agent
 
 select_automation_path:
@@ -45,12 +47,15 @@ select_automation_path:
     - Do not suggest Python when a Terraform provider or Ansible module exists.
     - Keep Red Hat Satellite, Proxmox, Cloudflare, and registry operations
       plan-only unless the boundary is explicitly elevated.
+    - Under live_read_check, allow only approved live reads, credentialed
+      Terraform planning, and Ansible check mode; keep mutation blocked.
     - For Proxmox provisioning, prefer the bpg/proxmox Terraform provider over
       telmate/proxmox unless a target feature documents otherwise.
   expected_output: >
     An automation-path decision with Terraform responsibilities, Ansible
     responsibilities, Bash glue if needed, rejected Python/API-wrapper options,
-    and provider/module checks the implementer must perform.
+    provider/module checks the implementer must perform, approved read/check
+    actions if the boundary allows them, and blocked mutation actions.
   agent: infrastructure_provisioning_agent
 
 draft_candidate_plan:
@@ -62,15 +67,17 @@ draft_candidate_plan:
 
     Include file-level changes, expected Terraform layout, expected Ansible layout,
     Satellite lifecycle notes, Proxmox notes, optional Cloudflare notes, validation
-    commands, rollback hints, and blockers. In the Proxmox notes, name the
-    bpg/proxmox provider, a pinned `required_providers` block, and variable-driven
-    provider config (no hardcoded endpoints or credentials). Do not include live
-    apply commands, plaintext secrets, or target-repo state updates as if they
-    already happened.
+    commands, rollback hints, and blockers. Separate approved read/check actions
+    from blocked mutation actions. In the Proxmox notes, name the bpg/proxmox
+    provider, a pinned `required_providers` block, and variable-driven provider
+    config (no hardcoded endpoints or credentials). Do not include mutation
+    commands, plaintext secrets, or target-repo state updates as if they already
+    happened.
   expected_output: >
     A markdown candidate plan with sections: Assumptions, Candidate Terraform,
     Candidate Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes,
-    Validation Commands, Rollback Hints, Blockers.
+    Approved Read/Check Actions, Blocked Mutation Actions, Validation Commands,
+    Rollback Hints, Blockers.
   agent: infrastructure_provisioning_agent
 
 validate_boundary:
@@ -84,7 +91,9 @@ validate_boundary:
     Check for:
     - live mutation hidden in validation commands
     - terraform apply/destroy or equivalent commands under plan_only
-    - Proxmox/Satellite/Cloudflare/registry mutation under plan_only
+    - Proxmox/Satellite/Cloudflare/registry mutation under any boundary
+    - credentialed Terraform planning or Ansible check mode under plan_only
+    - Ansible execution without check mode under live_read_check
     - plaintext secret values
     - claims that target repo feature state was updated when it was not
     - Python/custom API wrappers where Terraform or Ansible should be used
@@ -101,12 +110,16 @@ produce_handoff:
     HCP Terraform support context:
     {hcp_terraform_context}
 
-    The final answer must be plan-only under {allowed_boundary}. It must include
-    assumptions, candidate config plan, validation commands, rollback hints,
-    blockers, and the next repo-specific action. Do not claim target repo files
-    were changed. Do not include plaintext secrets.
+    The final answer must honor {allowed_boundary}. Under plan_only it must remain
+    plan-only. Under live_read_check it may include approved read/check actions
+    only, and must clearly separate approved read/check actions, blocked mutation
+    actions, required approvals, evidence needed before state closeout, validation
+    commands, rollback hints, blockers, and the next repo-specific action. Do not
+    claim target repo files were changed. Do not include plaintext secrets.
   expected_output: >
     Final markdown handoff with these sections: Summary, Assumptions, Candidate
-    Config, Validation Commands, Rollback Hints, Blockers, Next Action.
+    Config, Approved Read/Check Actions, Blocked Mutation Actions, Required
+    Approvals, Evidence Required Before State Closeout, Validation Commands,
+    Rollback Hints, Blockers, Next Action.
   agent: qa_contract_guardian
   output_file: output/infrastructure_handoff.md

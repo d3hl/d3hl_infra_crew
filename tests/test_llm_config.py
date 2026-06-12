@@ -14,7 +14,7 @@ class LlmConfigTests(unittest.TestCase):
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=True):
             llm = configured_llm()
         self.assertIsNotNone(llm)
-        self.assertEqual(llm.model, "deepseek/deepseek-r1")
+        self.assertEqual(llm.model, "deepseek/deepseek-v4-pro")
         self.assertEqual(llm.provider, "openrouter")
         self.assertEqual(llm.max_tokens, DEFAULT_MAX_TOKENS)
 

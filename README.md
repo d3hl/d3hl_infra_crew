@@ -27,6 +27,12 @@ Allowed by default:
 - Generate plan-only HCP Terraform and Ansible guidance.
 - Save local output under `output/`.
 
+Supported boundaries:
+
+- `plan_only`: local repo-state inspection and plan-only handoff generation.
+- `live_read_check`: approved live reads, target repo static checks, credentialed
+  Terraform plan runs, and Ansible check mode only.
+
 Explicitly gated:
 
 - Target repo `./init.sh` execution.
@@ -39,6 +45,7 @@ Not default:
 - `terraform apply`.
 - Live Proxmox, Satellite, registry, DNS, tunnel, or network mutation.
 - Plaintext secrets.
+- Target repo state closeout without verified implementation evidence.
 
 ## HCP Terraform support
 
@@ -49,7 +56,9 @@ Generated handoffs include HCP Terraform planning guidance without contacting HC
 - Workspace variables and variable sets for provider credentials and deployment inputs.
 - No token values in Terraform files, prompts, generated handoffs, or repo state.
 - `.terraformignore` recommendations for CLI-driven uploads.
-- Static validation only under `plan_only`; credentialed HCP remote runs require explicit approval.
+- Static validation only under `plan_only`; credentialed HCP remote runs require
+  explicit approval and at most the `live_read_check` boundary until mutation is
+  separately approved.
 
 ## Run
 
@@ -71,6 +80,12 @@ For an LLM-free dry run of trigger parsing, the repo-state adapter, boundary-saf
 
 ```bash
 UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Dry-run active feature handoff","allowed_boundary":"plan_only","dry_run":true}'
+```
+
+For an approved read/check-stage dry run:
+
+```bash
+UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'
 ```
 
 ## Verify

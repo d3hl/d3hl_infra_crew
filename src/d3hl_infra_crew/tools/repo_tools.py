@@ -31,7 +31,10 @@ class RepoStateTool(BaseTool):
 
 class BoundaryInput(BaseModel):
     text: str = Field(..., description="Candidate handoff or plan to inspect.")
-    allowed_boundary: str = Field("plan_only", description="Allowed authority boundary, normally plan_only.")
+    allowed_boundary: str = Field(
+        "plan_only",
+        description="Allowed authority boundary. Supported values: plan_only, live_read_check.",
+    )
 
 
 class BoundaryPolicyTool(BaseTool):

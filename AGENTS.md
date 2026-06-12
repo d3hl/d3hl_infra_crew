@@ -15,6 +15,12 @@ CrewAI orchestrator for d3HL infrastructure repos. This repo is application code
 
 Default boundary is `plan_only`.
 
+Supported boundaries:
+- `plan_only`: local repo-state inspection, plan-only guidance, and local output only.
+- `live_read_check`: first live stage after explicit approval; permits live reads,
+  target repo static checks, credentialed Terraform plans, and Ansible check mode
+  only. It does not permit mutation or target repo state closeout.
+
 Allowed by default:
 - Read repo harness files and git state.
 - Run this repo's local static checks.
@@ -33,6 +39,7 @@ Not allowed by default:
 - Registry/image push.
 - Cloudflare DNS/tunnel mutation.
 - Plaintext secrets in prompts, files, outputs, or logs.
+- Target repo state closeout without verified implementation evidence.
 
 ## Implementation rules
 
