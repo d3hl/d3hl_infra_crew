@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SUPPORTED_BOUNDARIES = {"plan_only", "live_read_check"}
+SUPPORTED_BOUNDARIES = {"plan_only", "live_read_check", "live_apply_gated"}
 
 PLAN_ONLY_BLOCKED_PATTERNS = [
     r"\bterraform\s+login\b",
@@ -30,6 +30,29 @@ LIVE_READ_CHECK_BLOCKED_PATTERNS = [
     r"\bpodman\s+push\b",
     r"\bcloudflare\b[^\n]*(create|update|delete|apply)",
     r"\bsatellite\b[^\n]*(publish|promote|register|delete|sync)",
+]
+
+# Explicit teardown commands. These stay blocked at every boundary, including the
+# most permissive one: the orchestrator may build, but never emits an explicit teardown.
+ALWAYS_BLOCKED_TEARDOWN_PATTERNS = [
+    r"\bterraform\s+destroy\b",
+    r"\btofu\s+destroy\b",
+    r"\bqm\s+destroy\b",
+    r"\bpvesh\s+delete\b",
+    r"\bcloudflare\b[^\n]*delete",
+    r"\bsatellite\b[^\n]*delete",
+]
+
+# Create/update/apply commands permitted under live_apply_gated, but only on a line
+# that carries an explicit operator-approved apply gate marker.
+GATED_MUTATION_PATTERNS = [
+    r"\bterraform(?:\s+-chdir=\S+)?\s+apply\b",
+    r"\btofu\s+apply\b",
+    r"\bqm\s+(create|set|importdisk|template|start|stop|clone)\b",
+    r"\bpvesh\s+(create|set)\b",
+    r"\bpodman\s+push\b",
+    r"\bcloudflare\b[^\n]*(create|update|apply)",
+    r"\bsatellite\b[^\n]*(publish|promote|register|sync)",
 ]
 
 PLAINTEXT_SECRET_PATTERNS = [
@@ -64,6 +87,15 @@ def _ansible_line_looks_mutating(line: str) -> bool:
 def _is_operator_approved_podman_login(line: str) -> bool:
     lowered = line.lower()
     return "operator-approved" in lowered or "approval gate" in lowered or "approved login gate" in lowered
+
+
+def _is_operator_approved_mutation(line: str) -> bool:
+    lowered = line.lower()
+    return (
+        "operator-approved" in lowered
+        or "approval gate" in lowered
+        or ("approved" in lowered and "gate" in lowered)
+    )
 
 
 @dataclass
@@ -113,6 +145,22 @@ def evaluate_boundary(text: str, allowed_boundary: str = "plan_only") -> Boundar
                     findings.append("mutating ansible-playbook present without --check under live_read_check")
                 else:
                     findings.append("ansible-playbook present without --check under live_read_check")
+
+    if lowered_boundary == "live_apply_gated":
+        for pattern in ALWAYS_BLOCKED_TEARDOWN_PATTERNS:
+            if re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL):
+                findings.append(f"explicit teardown pattern present (blocked at every boundary): {pattern}")
+        for pattern in GATED_MUTATION_PATTERNS:
+            for line in _command_lines(text, pattern):
+                if not _is_operator_approved_mutation(line):
+                    findings.append(
+                        f"mutation pattern present without an operator-approved apply gate under live_apply_gated: {pattern}"
+                    )
+        for line in _command_lines(text, r"\bansible-playbook\b"):
+            if _is_ansible_syntax_check(line) or _is_ansible_check_mode(line):
+                continue
+            if not _is_operator_approved_mutation(line):
+                findings.append("ansible-playbook present without an operator-approved apply gate under live_apply_gated")
 
     for pattern in PLAINTEXT_SECRET_PATTERNS:
         for match in re.finditer(pattern, text, flags=re.IGNORECASE | re.DOTALL):

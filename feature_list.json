@@ -98,6 +98,31 @@
         "2026-06-13 dry run passed: UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger with target_repo=bootc, allowed_boundary=live_read_check, dry_run=true, and request='Read/check live-stage validation' wrote output/infrastructure_handoff.md with no boundary findings."
       ],
       "notes": "live_read_check is read/check only. It does not permit Terraform apply/destroy, Proxmox mutation, registry push, Cloudflare or Satellite mutation, target repo state closeout, or plaintext secrets."
+    },
+    {
+      "id": "CREW-004",
+      "priority": 5,
+      "area": "boundary",
+      "title": "Add gated-mutation boundary (apply-only)",
+      "description": "Add live_apply_gated as the third boundary rung: approved create/update/apply actions are allowed only when each command carries an explicit operator-approved apply gate, while explicit teardown (terraform/tofu destroy, qm destroy, Proxmox/Satellite/Cloudflare/registry removal) stays blocked at every boundary. Plan_only and live_read_check remain unchanged; plaintext secrets stay prohibited.",
+      "dependencies": [
+        "CREW-003"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "Boundary tests prove gated apply is allowed only with an operator-approved apply gate under live_apply_gated",
+        "Boundary tests prove ungated apply, ungated Ansible converge, and explicit teardown are blocked under live_apply_gated",
+        "Boundary tests prove plaintext secrets remain blocked under live_apply_gated",
+        "LLM-free dry run writes output/infrastructure_handoff.md with allowed_boundary=live_apply_gated and no boundary findings",
+        "plan_only and live_read_check dry runs still pass with no regression"
+      ],
+      "evidence": [
+        "2026-06-13 focused tests passed for tests.test_boundary (18 cases) with UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy, covering gated apply allowed with marker, ungated apply blocked, terraform destroy blocked even with marker, gated/ungated Ansible converge, terraform plan allowed, and plaintext token blocked under live_apply_gated.",
+        "2026-06-13 LLM-free dry runs for plan_only, live_read_check, and live_apply_gated each wrote output/infrastructure_handoff.md with no Boundary Findings section (evaluate_boundary passed).",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, 35 unit tests passed, and git diff --check completed."
+      ],
+      "notes": "Apply-only by design: there is no boundary value that permits an explicit teardown command. A future rung can add gated teardown if automated destroy becomes a real need. The approval gate is a per-command marker (operator-approved / approval gate / approved ... gate), mirroring the existing podman-login gate."
     }
   ]
 }

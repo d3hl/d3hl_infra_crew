@@ -5,13 +5,14 @@ Last updated: 2026-06-13
 ## Current Verified State
 
 - CrewAI Flow scaffold was created with `crewai create flow d3hl_infra_crew`.
-- `CREW-000`, `CREW-001`, `CREW-002`, and `CREW-003` are implemented and passing.
+- `CREW-000`, `CREW-001`, `CREW-002`, `CREW-003`, and `CREW-004` are implemented and passing.
 - The repo contains one Flow wrapping one sequential infrastructure Crew with three agents: repo state analyst, infrastructure provisioning agent, and QA contract guardian.
 - Repo-state adapters read target repo harness state without centralizing it.
 - The infrastructure provisioning agent owns plan-only HCP Terraform, Ansible, Red Hat Satellite, Proxmox, and Cloudflare planning while repo-state and QA tools stay isolated.
 - Shared HCP Terraform support context is wired into normal Crew inputs and deterministic dry-run handoffs.
 - Boundary checks block credentialed Terraform login and plan commands under `plan_only` while allowing static formatting and backend-disabled validation guidance.
 - `live_read_check` is implemented as the first approval-gated live stage: approved live reads, target repo static checks, credentialed Terraform plans, and Ansible check mode are allowed while mutation remains blocked.
+- `live_apply_gated` is implemented as the third rung (apply-only): approved create/update/apply is allowed only when each command carries an explicit operator-approved apply gate, and explicit teardown (terraform/tofu destroy, qm destroy, Proxmox/Satellite/Cloudflare/registry removal) is blocked at every boundary. Apply-only by design; there is no boundary that permits an explicit teardown command.
 - Default authority is `plan_only`; target repo live mutation remains gated.
 - CrewAI is pinned to `1.14.6`.
 
@@ -27,6 +28,8 @@ Last updated: 2026-06-13
 - 2026-06-13 focused unit tests passed for `tests.test_boundary`, `tests.test_hcp_terraform`, and `tests.test_llm_config` with `UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy`.
 - 2026-06-13 `./init.sh` passed after `CREW-003`: required files present, `feature_list.json` valid, Python compile passed, 28 unit tests passed, and `git diff --check` completed.
 - 2026-06-13 LLM-free read/check dry run passed: `UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'` inspected the bootc repo and wrote `output/infrastructure_handoff.md` with no boundary findings.
+- 2026-06-13 `./init.sh` passed after `CREW-004`: required files present, `feature_list.json` valid, Python compile passed, 35 unit tests passed (18 in `tests.test_boundary`), and `git diff --check` completed.
+- 2026-06-13 LLM-free dry runs for `plan_only`, `live_read_check`, and `live_apply_gated` each wrote `output/infrastructure_handoff.md` with no `Boundary Findings` section: `evaluate_boundary` passed for all three. The `live_apply_gated` handoff documents gated apply (operator-approved apply gate required) and teardown-blocked, and self-validates clean.
 
 ## Blockers / Risks
 
@@ -37,4 +40,4 @@ Last updated: 2026-06-13
 
 ## Recommended Next Step
 
-Use `allowed_boundary=plan_only` for guidance-only handoffs. Use `allowed_boundary=live_read_check` only after explicit approval for read/check evidence collection; mutation remains a separate future boundary.
+Use `allowed_boundary=plan_only` for guidance-only handoffs. Use `allowed_boundary=live_read_check` only after explicit approval for read/check evidence collection. Use `allowed_boundary=live_apply_gated` only after explicit approval, and only with an operator-approved apply gate on each apply command; explicit teardown stays blocked at every boundary. A future rung (gated teardown) is the next boundary if automated destroy ever becomes a real need — it is intentionally not implemented yet.

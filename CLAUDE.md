@@ -12,12 +12,13 @@ Default authority is `plan_only`. This is the central design constraint, enforce
 
 - **Allowed**: read target repo files/git state, run this repo's local static checks (`./init.sh`), generate plan-only Terraform/Ansible guidance, write under `output/`.
 - **Gated (needs explicit user approval)**: running a *target* repo's `./init.sh` (the `run_static_checks` flag in the trigger payload), credentialed `terraform plan` / Ansible check mode, live reads against Proxmox / Satellite / Cloudflare / registries / network devices.
-- **Never by default**: `terraform apply`/`destroy`, any live infra mutation, plaintext secrets. `op://d3HLPRV/...` strings are kept as references only — never resolve them.
+- **Never by default**: any live infra mutation, plaintext secrets. `terraform apply` and other create/update/apply mutation become allowed *only* under `live_apply_gated` with an explicit operator-approved apply gate; explicit teardown (`terraform`/`tofu destroy`, `qm destroy`, Proxmox/Satellite/Cloudflare/registry removal) is never allowed at any boundary. `op://d3HLPRV/...` strings are kept as references only — never resolve them.
 
 Supported `allowed_boundary` values:
 
 - `plan_only`: default guidance/output mode. Blocks credentialed Terraform planning, Ansible execution other than static syntax checks, live reads, and all mutation.
 - `live_read_check`: first live stage. Allows approved live reads, credential setup, credentialed Terraform planning, and Ansible `--check`; still blocks mutation, pushes, lifecycle changes, and target repo state closeout.
+- `live_apply_gated`: gated mutation stage (superset of `live_read_check`). Allows approved create/update/apply only when each command carries an explicit operator-approved apply gate marker (`operator-approved` / `approval gate` / `approved … gate`, mirroring the podman-login gate). Explicit teardown stays blocked at every boundary, and plaintext secrets stay prohibited. Apply-only by design — there is no boundary that permits an explicit teardown command.
 
 `evaluate_boundary()` scans generated text for live-mutation command patterns and plaintext-secret patterns; a failing check appends "Boundary Findings" to the handoff rather than blocking the write. Do not weaken these patterns to make output pass.
 

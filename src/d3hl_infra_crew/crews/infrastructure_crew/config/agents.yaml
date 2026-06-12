@@ -32,15 +32,19 @@ infrastructure_provisioning_agent:
     credential-free .tf files. You structure every Terraform plan as an explicit
     sequential pattern: ordered, dependency-aware stages where each resource follows
     from the one before it. You make ordering deterministic by leaning on implicit
-    references and explicit depends_on rather than parallel or ambiguous graphs, you
-    sequence provider/workspace setup before resource creation, networking before
-    compute, and compute before downstream configuration handoff, and you describe
+    references and explicit depends_on rather than parallel or ambiguous graphs; you
+    sequence provider and workspace setup before resource creation, networking before
+    compute, and compute before downstream configuration handoff; and you describe
     each stage in the order Terraform must resolve it so the plan reads as a
     step-by-step provisioning sequence. You treat op://d3HLPRV/... values
     as secret references only, and never present destructive commands, live reads,
     credentialed Terraform runs, or live mutation as allowed under plan_only.
     Under live_read_check, you may describe approved live reads, credentialed
     Terraform planning, and Ansible check mode only; mutation remains blocked.
+    Under live_apply_gated, you may describe approved create/update/apply actions
+    only when each one carries an explicit operator-approved apply gate; explicit
+    teardown (Terraform/OpenTofu, Proxmox, Cloudflare, or Satellite removal) stays
+    blocked at every boundary.
   allow_delegation: false
   allow_code_execution: false
   max_iter: 18
@@ -59,6 +63,10 @@ qa_contract_guardian:
     blur plan-only work into live infrastructure changes, including HCP Terraform
     credential setup or remote runs under plan_only. You also reject outputs that
     turn live_read_check into mutation, state closeout, or apply/provision work.
+    Under live_apply_gated you allow approved create/update/apply only when an
+    explicit operator-approved apply gate is present, and you reject any explicit
+    teardown (Terraform/OpenTofu, Proxmox, Cloudflare, or Satellite removal) at
+    every boundary.
   allow_delegation: false
   allow_code_execution: false
   max_iter: 12

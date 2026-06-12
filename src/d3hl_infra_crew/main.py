@@ -110,7 +110,24 @@ def render_dry_run_handoff(
         verification_status = f"static check return code: {static_check.get('returncode')}"
     hcp_context = hcp_terraform_context or hcp_terraform_support_context()
     normalized_boundary = allowed_boundary.lower().strip()
-    if normalized_boundary == "live_read_check":
+    if normalized_boundary == "live_apply_gated":
+        boundary_summary = (
+            "Gated apply stage: approved create/update/apply actions are allowed only with an "
+            "explicit operator-approved apply gate; explicit teardown (Terraform/OpenTofu, Proxmox, "
+            "Cloudflare, or Satellite removal) stays blocked at every boundary."
+        )
+        next_action_scope = (
+            "keep the next action within the operator-approved apply gate and never emit explicit "
+            "teardown unless the user approves a dedicated teardown boundary"
+        )
+        validation_scope = (
+            "- Approved apply-stage actions require an explicit operator-approved apply gate on the same "
+            "command, for example a gated `terraform apply` or a gated Proxmox create/set run.\n"
+            "- Teardown stays blocked at every boundary: no Terraform/OpenTofu teardown, no Proxmox VM "
+            "teardown, and no Cloudflare or Satellite resource removal.\n"
+            "- Plaintext secrets remain prohibited; keep `op://d3HLPRV/...` references only."
+        )
+    elif normalized_boundary == "live_read_check":
         boundary_summary = (
             "Approved read/check stage: live reads, credential setup, credentialed Terraform plan runs, "
             "and Ansible --check are allowed only after explicit approval; mutation remains blocked."
