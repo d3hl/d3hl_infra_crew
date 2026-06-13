@@ -9,15 +9,13 @@ from crewai.flow import Flow, listen, start
 from pydantic import BaseModel, Field
 
 from d3hl_infra_crew.crews.infrastructure_crew.infrastructure_crew import InfrastructureCrew
-from d3hl_infra_crew.boundary import evaluate_boundary
 from d3hl_infra_crew.hcp_terraform import hcp_terraform_support_context
 from d3hl_infra_crew.repo_state import collect_repo_state
 
 
 class InfrastructureState(BaseModel):
     target_repo: str = "bootc"
-    infrastructure_request: str = "Produce a plan-only infrastructure handoff for the active feature."
-    allowed_boundary: str = "plan_only"
+    infrastructure_request: str = "Draft and write the active feature's infrastructure changes into the target repo."
     run_static_checks: bool = False
     repo_state: str = ""
     hcp_terraform_context: str = Field(default_factory=hcp_terraform_support_context)
@@ -41,11 +39,9 @@ class InfrastructureFlow(Flow[InfrastructureState]):
         self.state.infrastructure_request = str(
             payload.get("infrastructure_request", payload.get("request", self.state.infrastructure_request))
         )
-        self.state.allowed_boundary = str(payload.get("allowed_boundary", self.state.allowed_boundary))
         self.state.run_static_checks = bool(payload.get("run_static_checks", self.state.run_static_checks))
         self.state.dry_run = bool(payload.get("dry_run", self.state.dry_run))
         print(f"Target repo: {self.state.target_repo}")
-        print(f"Boundary: {self.state.allowed_boundary}")
         print(f"Run static checks: {self.state.run_static_checks}")
         print(f"Dry run: {self.state.dry_run}")
 
@@ -66,7 +62,6 @@ class InfrastructureFlow(Flow[InfrastructureState]):
             self.state.final_handoff = render_dry_run_handoff(
                 target_repo=self.state.target_repo,
                 infrastructure_request=self.state.infrastructure_request,
-                allowed_boundary=self.state.allowed_boundary,
                 repo_state=self.state.repo_state,
                 hcp_terraform_context=self.state.hcp_terraform_context,
             )
@@ -78,7 +73,6 @@ class InfrastructureFlow(Flow[InfrastructureState]):
             inputs={
                 "target_repo": self.state.target_repo,
                 "infrastructure_request": self.state.infrastructure_request,
-                "allowed_boundary": self.state.allowed_boundary,
                 "repo_state": self.state.repo_state,
                 "hcp_terraform_context": self.state.hcp_terraform_context,
             }
@@ -97,7 +91,6 @@ class InfrastructureFlow(Flow[InfrastructureState]):
 def render_dry_run_handoff(
     target_repo: str,
     infrastructure_request: str,
-    allowed_boundary: str,
     repo_state: str,
     hcp_terraform_context: str | None = None,
 ) -> str:
@@ -109,51 +102,15 @@ def render_dry_run_handoff(
     if static_check:
         verification_status = f"static check return code: {static_check.get('returncode')}"
     hcp_context = hcp_terraform_context or hcp_terraform_support_context()
-    normalized_boundary = allowed_boundary.lower().strip()
-    if normalized_boundary == "live_apply_gated":
-        boundary_summary = (
-            "Gated apply stage: approved create/update/apply actions are allowed only with an "
-            "explicit operator-approved apply gate; explicit teardown (Terraform/OpenTofu, Proxmox, "
-            "Cloudflare, or Satellite removal) stays blocked at every boundary."
-        )
-        next_action_scope = (
-            "keep the next action within the operator-approved apply gate and never emit explicit "
-            "teardown unless the user approves a dedicated teardown boundary"
-        )
-        validation_scope = (
-            "- Approved apply-stage actions require an explicit operator-approved apply gate on the same "
-            "command, for example a gated `terraform apply` or a gated Proxmox create/set run.\n"
-            "- Teardown stays blocked at every boundary: no Terraform/OpenTofu teardown, no Proxmox VM "
-            "teardown, and no Cloudflare or Satellite resource removal.\n"
-            "- Plaintext secrets remain prohibited; keep `op://d3HLPRV/...` references only."
-        )
-    elif normalized_boundary == "live_read_check":
-        boundary_summary = (
-            "Approved read/check stage: live reads, credential setup, credentialed Terraform plan runs, "
-            "and Ansible --check are allowed only after explicit approval; mutation remains blocked."
-        )
-        next_action_scope = "keep the next action within approved read/check scope unless the user explicitly approves a higher boundary"
-        validation_scope = (
-            "- Read/check live-stage actions may include approved live reads, `terraform login`, "
-            "`terraform plan`, and `ansible-playbook --check`.\n"
-            "- Mutation remains blocked: Terraform mutation/destruction equivalents, Proxmox mutation, "
-            "registry pushes, Cloudflare changes, and Satellite lifecycle changes."
-        )
-    else:
-        boundary_summary = (
-            "Plan-only stage: generate guidance and local output only; credentialed live reads, "
-            "remote Terraform runs, and Ansible execution stay behind a later approval gate."
-        )
-        next_action_scope = "keep the next action plan-only unless the user explicitly approves a higher boundary"
-        validation_scope = (
-            "- Local orchestrator baseline: `./init.sh` from `/home/d3/Github/d3hl_infra_crew`.\n"
-            "- Target baseline command: `{baseline_command}` from `{target_path}`.\n"
-            "- Target verification status in this run: {verification_status}."
-        ).format(
-            baseline_command=state.get("baseline_command") or "not available",
-            target_path=state.get("path"),
-            verification_status=verification_status,
-        )
+    validation_scope = (
+        "- Local orchestrator baseline: `./init.sh` from `/home/d3/Github/d3hl_infra_crew`.\n"
+        "- Target baseline command: `{baseline_command}` from `{target_path}`.\n"
+        "- Target verification status in this run: {verification_status}."
+    ).format(
+        baseline_command=state.get("baseline_command") or "not available",
+        target_path=state.get("path"),
+        verification_status=verification_status,
+    )
 
     handoff = f"""# Infrastructure Handoff Dry Run
 
@@ -161,11 +118,9 @@ def render_dry_run_handoff(
 Infrastructure dry run for `{target_repo}`. Request: {infrastructure_request}
 
 ## Assumptions
-- Allowed boundary is `{allowed_boundary}`.
-- Boundary scope: {boundary_summary}
-- Target repo remains authoritative for its own harness files and infrastructure code.
-- No target repo files were changed by this dry run.
-- No live HCP Terraform, Proxmox, Satellite, Cloudflare, registry, or network mutation was attempted.
+- This is an LLM-free dry run: no files were written to the target repo.
+- A live crew run writes the generated files into the target repo via `write_repo_file`.
+- Target repo paths resolve under `/home/d3/Github`.
 
 ## Candidate Config
 - HCP Terraform remains the provisioning path for infrastructure, VM, DNS, tunnel, Cloudflare, and Proxmox-resource planning.
@@ -188,11 +143,8 @@ Infrastructure dry run for `{target_repo}`. Request: {infrastructure_request}
 {chr(10).join(f'- {blocker}' for blocker in blockers) if blockers else '- None from repo-state adapter.'}
 
 ## Next Action
-Start from feature `{active_feature.get('id', 'unknown')}` ({active_feature.get('title', 'unknown')}) in `{target_repo}` and {next_action_scope}.
+Start from feature `{active_feature.get('id', 'unknown')}` ({active_feature.get('title', 'unknown')}) in `{target_repo}`. Run a live crew run (no `dry_run`) to draft and write the changes into the target repo with human review.
 """
-    boundary = evaluate_boundary(handoff, allowed_boundary=allowed_boundary)
-    if not boundary.passed:
-        handoff += "\n## Boundary Findings\n" + "\n".join(f"- {finding}" for finding in boundary.findings) + "\n"
     return handoff
 
 
@@ -225,13 +177,11 @@ def run_with_trigger():
                 trigger_payload.get("request", InfrastructureState().infrastructure_request),
             )
         )
-        allowed_boundary = str(trigger_payload.get("allowed_boundary", InfrastructureState().allowed_boundary))
         run_static_checks = bool(trigger_payload.get("run_static_checks", False))
         output_path = Path(str(trigger_payload.get("output_path", InfrastructureState().output_path)))
 
         print("Collecting infrastructure crew inputs")
         print(f"Target repo: {target_repo}")
-        print(f"Boundary: {allowed_boundary}")
         print(f"Run static checks: {run_static_checks}")
         print("Dry run: True")
         print("Inspecting target repo harness state")
@@ -241,7 +191,6 @@ def run_with_trigger():
         handoff = render_dry_run_handoff(
             target_repo=target_repo,
             infrastructure_request=infrastructure_request,
-            allowed_boundary=allowed_boundary,
             repo_state=snapshot.to_prompt_json(),
             hcp_terraform_context=hcp_terraform_support_context(),
         )

@@ -5,7 +5,8 @@ Last updated: 2026-06-13
 ## Current Verified State
 
 - CrewAI Flow scaffold was created with `crewai create flow d3hl_infra_crew`.
-- `CREW-000`, `CREW-001`, `CREW-002`, `CREW-003`, and `CREW-004` are implemented and passing.
+- `CREW-000`, `CREW-001`, `CREW-002`, `CREW-003`, `CREW-004`, and `CREW-005` are implemented and passing.
+- `CREW-005` removed the boundary system entirely (boundary.py, the plan_only/live_read_check/live_apply_gated ladder, BoundaryPolicyTool, evaluate_boundary, allowed_boundary) and added `RepoWriteTool` (`write_repo_file`) so the crew writes real files into a target repo under `/home/d3/Github`. The `apply_changes` task is interactive (`human_input`). This is a deliberate, operator-approved reversal of the original plan-only design; no automated secret/mutation scanning remains, and it diverges from agent-contract-master's plan-only shared contract.
 - The repo contains one Flow wrapping one sequential infrastructure Crew with three agents: repo state analyst, infrastructure provisioning agent, and QA contract guardian.
 - Repo-state adapters read target repo harness state without centralizing it.
 - The infrastructure provisioning agent owns plan-only HCP Terraform, Ansible, Red Hat Satellite, Proxmox, and Cloudflare planning while repo-state and QA tools stay isolated.
@@ -30,6 +31,7 @@ Last updated: 2026-06-13
 - 2026-06-13 LLM-free read/check dry run passed: `UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'` inspected the bootc repo and wrote `output/infrastructure_handoff.md` with no boundary findings.
 - 2026-06-13 `./init.sh` passed after `CREW-004`: required files present, `feature_list.json` valid, Python compile passed, 35 unit tests passed (18 in `tests.test_boundary`), and `git diff --check` completed.
 - 2026-06-13 LLM-free dry runs for `plan_only`, `live_read_check`, and `live_apply_gated` each wrote `output/infrastructure_handoff.md` with no `Boundary Findings` section: `evaluate_boundary` passed for all three. The `live_apply_gated` handoff documents gated apply (operator-approved apply gate required) and teardown-blocked, and self-validates clean.
+- 2026-06-13 `CREW-005` removed the boundary system: `./init.sh` passed (unit tests include `tests.test_repo_write`); a grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over `src` and `tests` returned no policy-gate references; LLM-free dry runs for bootc and proxmox wrote `output/infrastructure_handoff.md` and left both target repos git-clean.
 
 ## Blockers / Risks
 
@@ -40,4 +42,4 @@ Last updated: 2026-06-13
 
 ## Recommended Next Step
 
-Use `allowed_boundary=plan_only` for guidance-only handoffs. Use `allowed_boundary=live_read_check` only after explicit approval for read/check evidence collection. Use `allowed_boundary=live_apply_gated` only after explicit approval, and only with an operator-approved apply gate on each apply command; explicit teardown stays blocked at every boundary. A future rung (gated teardown) is the next boundary if automated destroy ever becomes a real need — it is intentionally not implemented yet.
+Use `dry_run:true` to inspect a handoff without an LLM key or any target-repo writes. For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; the `apply_changes` task pauses for human review before writing generated files into the target repo. There is no boundary gate — review changes at the interactive checkpoint and via the target repo's git status before committing them there.

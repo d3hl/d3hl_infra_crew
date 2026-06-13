@@ -1,20 +1,14 @@
 import json
 import unittest
 
-from d3hl_infra_crew.boundary import evaluate_boundary
 from d3hl_infra_crew.hcp_terraform import hcp_terraform_support_context
 from d3hl_infra_crew.main import render_dry_run_handoff
 
 
 class HcpTerraformTests(unittest.TestCase):
-    def test_support_context_is_boundary_safe_under_plan_only(self):
-        check = evaluate_boundary(hcp_terraform_support_context(), "plan_only")
-        self.assertTrue(check.passed, check.findings)
-
     def test_support_context_prefers_bpg_proxmox_provider(self):
         context = hcp_terraform_support_context()
         self.assertIn("bpg/proxmox", context)
-        self.assertTrue(evaluate_boundary(context, "plan_only").passed)
 
     def test_dry_run_handoff_includes_hcp_terraform_guidance(self):
         repo_state = {
@@ -29,7 +23,6 @@ class HcpTerraformTests(unittest.TestCase):
         handoff = render_dry_run_handoff(
             target_repo="bootc",
             infrastructure_request="Dry-run HCP Terraform support",
-            allowed_boundary="plan_only",
             repo_state=json.dumps(repo_state),
         )
         self.assertIn("## HCP Terraform Support", handoff)
@@ -38,7 +31,6 @@ class HcpTerraformTests(unittest.TestCase):
         self.assertIn(".terraformignore", handoff)
         self.assertIn("bpg/proxmox", handoff)
         self.assertIn("TF-001", handoff)
-        self.assertTrue(evaluate_boundary(handoff, "plan_only").passed)
 
 
 if __name__ == "__main__":

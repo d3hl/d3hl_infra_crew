@@ -22,15 +22,10 @@ classify_infra_request:
     {hcp_terraform_context}
 
     Split the request into provisioning, configuration, lifecycle, DNS/tunnel,
-    validation, documentation, or repo-harness scope. Preserve the allowed
-    boundary: {allowed_boundary}. Supported boundaries are `plan_only`,
-    `live_read_check`, and `live_apply_gated` (approved create/update/apply only
-    with an explicit operator-approved apply gate; explicit teardown stays blocked
-    at every boundary). Do not invent any boundary beyond these three.
+    validation, documentation, or repo-harness scope.
   expected_output: >
-    A classification brief naming the primary scope, secondary scopes, out-of-scope
-    live actions, required inputs, whether read/check actions are allowed, and
-    the next approval gate if any.
+    A classification brief naming the primary scope, secondary scopes, required
+    inputs, and the target files the change will create or modify.
   agent: infrastructure_provisioning_agent
 
 select_automation_path:
@@ -47,90 +42,70 @@ select_automation_path:
       application deployment, validation, and day-2 operations.
     - Use Bash only as glue around Terraform or Ansible.
     - Do not suggest Python when a Terraform provider or Ansible module exists.
-    - Keep Red Hat Satellite, Proxmox, Cloudflare, and registry operations
-      plan-only unless the boundary is explicitly elevated.
-    - Under live_read_check, allow only approved live reads, credentialed
-      Terraform planning, and Ansible check mode; keep mutation blocked.
-    - Under live_apply_gated, allow approved create/update/apply only when each
-      command carries an explicit operator-approved apply gate; keep explicit
-      teardown (destroy/removal) blocked at every boundary.
     - For Proxmox provisioning, prefer the bpg/proxmox Terraform provider over
       telmate/proxmox unless a target feature documents otherwise.
   expected_output: >
     An automation-path decision with Terraform responsibilities, Ansible
     responsibilities, Bash glue if needed, rejected Python/API-wrapper options,
-    provider/module checks the implementer must perform, approved read/check
-    actions if the boundary allows them, and blocked mutation actions.
+    and provider/module checks the implementer must perform.
   agent: infrastructure_provisioning_agent
 
 draft_candidate_plan:
   description: >
-    Draft a plan-only candidate implementation for {infrastructure_request}.
+    Draft a candidate implementation for {infrastructure_request} in target repo
+    {target_repo}.
 
     HCP Terraform support context:
     {hcp_terraform_context}
 
-    Include file-level changes, expected Terraform layout, expected Ansible layout,
-    Satellite lifecycle notes, Proxmox notes, optional Cloudflare notes, validation
-    commands, rollback hints, and blockers. Separate approved read/check actions
-    from blocked mutation actions. In the Proxmox notes, name the bpg/proxmox
-    provider, a pinned `required_providers` block, and variable-driven provider
-    config (no hardcoded endpoints or credentials). Do not include mutation
-    commands, plaintext secrets, or target-repo state updates as if they already
-    happened.
+    Include the exact files to create or modify with their target-repo-relative
+    paths and full proposed content, the expected Terraform layout, the expected
+    Ansible layout, Satellite lifecycle notes, Proxmox notes, optional Cloudflare
+    notes, validation commands, and rollback hints. In the Proxmox notes, name the
+    bpg/proxmox provider, a pinned `required_providers` block, and variable-driven
+    provider config.
   expected_output: >
-    A markdown candidate plan with sections: Assumptions, Candidate Terraform,
-    Candidate Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes,
-    Approved Read/Check Actions, Blocked Mutation Actions, Validation Commands,
-    Rollback Hints, Blockers.
+    A markdown candidate plan with sections: Assumptions, Files To Write (each with
+    its target-repo-relative path and full content), Candidate Terraform, Candidate
+    Ansible, Satellite Lifecycle Notes, Proxmox Notes, Cloudflare Notes, Validation
+    Commands, Rollback Hints, Blockers.
   agent: infrastructure_provisioning_agent
 
-validate_boundary:
+review_candidate_plan:
   description: >
-    Validate the candidate plan against allowed boundary {allowed_boundary} and
-    the d3HL shared contract.
+    Review the candidate plan for target repo {target_repo} for correctness before
+    it is applied.
 
     HCP Terraform support context:
     {hcp_terraform_context}
 
     Check for:
-    - live mutation hidden in validation commands
-    - terraform apply/destroy or equivalent commands under plan_only
-    - credentialed Terraform planning or Ansible check mode under plan_only
-    - Ansible execution without check mode under live_read_check
-    - any terraform apply/create/update or Ansible converge under live_read_check
-    - ungated apply (no operator-approved apply gate) under live_apply_gated
-    - explicit teardown (terraform/tofu destroy, qm destroy, Proxmox/Satellite/
-      Cloudflare/registry removal) under any boundary
-    - plaintext secret values
-    - claims that target repo feature state was updated when it was not
+    - Terraform used for provisioning and Ansible used for configuration
+    - bpg/proxmox provider with a pinned required_providers block for Proxmox
     - Python/custom API wrappers where Terraform or Ansible should be used
+    - each file to write having a clear target-repo-relative path and complete content
+    - validation commands and rollback hints that match the proposed changes
   expected_output: >
-    A QA review with pass/fail, findings, required corrections, and final allowed
-    next action. If the output fails, provide corrected wording.
+    A review with pass/fail, findings, required corrections, and the confirmed list
+    of files to write with their target-repo-relative paths. If the plan fails,
+    provide corrected wording.
   agent: qa_contract_guardian
 
-produce_handoff:
+apply_changes:
   description: >
-    Produce the final handoff for target repo {target_repo} and request:
+    Apply the reviewed plan to target repo {target_repo} for request:
     {infrastructure_request}
 
-    HCP Terraform support context:
-    {hcp_terraform_context}
-
-    The final answer must honor {allowed_boundary}. Under plan_only it must remain
-    plan-only. Under live_read_check it may include approved read/check actions
-    only. Under live_apply_gated it may include approved create/update/apply
-    actions, but only where each one carries an explicit operator-approved apply
-    gate, and explicit teardown stays blocked. In every case clearly separate
-    approved actions, blocked mutation actions, required approvals, evidence needed
-    before state closeout, validation commands, rollback hints, blockers, and the
-    next repo-specific action. Do not claim target repo files were changed. Do not
-    include plaintext secrets.
+    Write each confirmed file into the target repo with the `write_repo_file` tool,
+    using the file's target-repo-relative path and full content. Pause for human
+    review and approval before writing, and incorporate any requested changes. After
+    writing, summarize exactly which files were created or modified, the validation
+    commands the operator should run next, rollback hints, and remaining blockers.
+    Do not claim a file was written unless the tool confirmed it.
   expected_output: >
-    Final markdown handoff with these sections: Summary, Assumptions, Candidate
-    Config, Approved Read/Check Actions, Blocked Mutation Actions, Required
-    Approvals, Evidence Required Before State Closeout, Validation Commands,
+    Final markdown summary with these sections: Summary, Files Written (absolute or
+    target-repo-relative paths confirmed by the write tool), Validation Commands,
     Rollback Hints, Blockers, Next Action.
-  agent: qa_contract_guardian
+  agent: infrastructure_provisioning_agent
+  human_input: true
   output_file: output/infrastructure_handoff.md

@@ -4,8 +4,7 @@
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
-    "do_not_skip_verification": true,
-    "default_authority": "plan_only"
+    "do_not_skip_verification": true
   },
   "features": [
     {
@@ -122,7 +121,32 @@
         "2026-06-13 LLM-free dry runs for plan_only, live_read_check, and live_apply_gated each wrote output/infrastructure_handoff.md with no Boundary Findings section (evaluate_boundary passed).",
         "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, 35 unit tests passed, and git diff --check completed."
       ],
-      "notes": "Apply-only by design: there is no boundary value that permits an explicit teardown command. A future rung can add gated teardown if automated destroy becomes a real need. The approval gate is a per-command marker (operator-approved / approval gate / approved ... gate), mirroring the existing podman-login gate."
+      "notes": "Apply-only by design: there is no boundary value that permits an explicit teardown command. A future rung can add gated teardown if automated destroy becomes a real need. The approval gate is a per-command marker (operator-approved / approval gate / approved ... gate), mirroring the existing podman-login gate. Superseded by CREW-005, which removed the boundary system entirely."
+    },
+    {
+      "id": "CREW-005",
+      "priority": 6,
+      "area": "crew",
+      "title": "Remove boundary system; add interactive target-repo write mode",
+      "description": "Remove the boundary gate (boundary.py, the plan_only/live_read_check/live_apply_gated ladder, BoundaryPolicyTool, evaluate_boundary, and allowed_boundary) entirely, and add RepoWriteTool (write_repo_file) so the crew writes real files into a target repo's working tree under /home/d3/Github. The apply_changes task is interactive via human_input. The dry_run path stays LLM-free and does not write into target repos. Path containment in resolve_repo and a path-escape guard in RepoWriteTool are retained as path safety.",
+      "dependencies": [
+        "CREW-004"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated returns nothing meaningful in src and tests",
+        "RepoWriteTool writes a file under a target repo and rejects a path that escapes it",
+        "LLM-free dry runs for bootc and proxmox write output/infrastructure_handoff.md and leave target repos git-clean",
+        "apply_changes task carries human_input and references write_repo_file"
+      ],
+      "evidence": [
+        "2026-06-13 boundary.py and tests/test_boundary.py deleted; BoundaryPolicyTool/evaluate_boundary/allowed_boundary removed from tools, crew, Flow, and YAML; RepoWriteTool added and bound to infrastructure_provisioning_agent.",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, unit tests passed (including tests.test_repo_write), and git diff --check completed.",
+        "2026-06-13 grep -ri for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over src and tests returned no policy-gate references.",
+        "2026-06-13 LLM-free dry runs for bootc and proxmox wrote output/infrastructure_handoff.md; target repos remained git-clean (no files written by dry run)."
+      ],
+      "notes": "Deliberate reversal of the repo's original plan-only design, approved by the operator. No automated secret-leak or mutation/teardown scanning remains. Diverges from agent-contract-master's shared contract (target repos authoritative / plan-only); that repo was not edited. Live interactive write runs require an LLM provider key."
     }
   ]
 }

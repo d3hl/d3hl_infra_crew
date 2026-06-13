@@ -1,6 +1,8 @@
 # AGENTS.md - d3hl_infra_crew
 
-CrewAI orchestrator for d3HL infrastructure repos. This repo is application code and keeps its own harness state.
+## What this repo is
+
+A CrewAI orchestrator for the d3HL homelab infrastructure repos that drafts and writes real files into a target repo. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree. The runtime lives here.
 
 ## Startup workflow
 
@@ -11,45 +13,26 @@ CrewAI orchestrator for d3HL infrastructure repos. This repo is application code
 5. Run `./init.sh` before feature work.
 6. Do not stack feature work on a failing baseline.
 
-## Authority boundary
+## Target-repo write mode
 
-Default boundary is `plan_only`.
+There is no authority/boundary gate. The crew drafts changes and **writes real files into
+the target repo** via the `write_repo_file` tool.
 
-Supported boundaries:
-- `plan_only`: local repo-state inspection, plan-only guidance, and local output only.
-- `live_read_check`: first live stage after explicit approval; permits live reads,
-  target repo static checks, credentialed Terraform plans, and Ansible check mode
-  only. It does not permit mutation or target repo state closeout.
-- `live_apply_gated`: gated mutation stage. Permits approved create/update/apply
-  actions only when each command carries an explicit operator-approved apply gate.
-  Explicit teardown (Terraform/OpenTofu destroy, Proxmox/Satellite/Cloudflare/registry
-  removal) stays blocked at every boundary, and plaintext secrets stay prohibited.
-
-Allowed by default:
-- Read repo harness files and git state.
-- Run this repo's local static checks.
-- Generate plan-only Terraform and Ansible guidance.
-- Write local orchestrator output under `output/`.
-
-Gated by explicit user approval:
-- Running target repo `./init.sh` through the Flow.
-- Credentialed `terraform plan` or Ansible check mode.
-- Live reads against Proxmox, Red Hat Satellite, Cloudflare, registry, or network devices.
-
-Not allowed by default:
-- `terraform apply`.
-- Live Proxmox mutation.
-- Satellite lifecycle mutation.
-- Registry/image push.
-- Cloudflare DNS/tunnel mutation.
-- Plaintext secrets in prompts, files, outputs, or logs.
-- Target repo state closeout without verified implementation evidence.
+- The live crew run writes generated files into the target repo's working tree; it can create
+  or overwrite files.
+- The interactive checkpoint is the `apply_changes` task's `human_input: true`: the run pauses
+  for human review/approval before writes are finalized.
+- The `dry_run` path is LLM-free and does not write into target repos; it only renders a handoff
+  to `output/`.
+- Path containment is retained: target paths resolve under `/home/d3/Github` (`resolve_repo`) and
+  `RepoWriteTool` rejects paths that escape the resolved repo. This is path safety, not an
+  authority gate.
+- No automated secret scanning remains. Keep `op://d3HLPRV/...` as references and avoid plaintext
+  secrets by discipline.
 
 ## Implementation rules
 
 - Use CrewAI Flow plus one sequential Crew first.
-- Keep target repos authoritative for their own `AGENTS.md`, `feature_list.json`, `claude-progress.md`, `init.sh`, Terraform, and Ansible files.
-- Do not centralize target repo state in this repo.
 - Terraform owns provisioning. Ansible owns configuration. Bash is glue only. Python is allowed here only for the CrewAI app and deterministic adapters.
 - Preserve `op://d3HLPRV/...` references as references only.
 
