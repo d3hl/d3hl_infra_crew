@@ -2,7 +2,8 @@
 
 ## What this repo is
 
-A CrewAI orchestrator for the d3HL homelab infrastructure repos that drafts and writes real files into a target repo. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree. The runtime lives here.
+A CrewAI orchestrator for the d3HL homelab infrastructure repos that drafts and writes real files into a target repo. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a 
+candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree. The runtime lives here.
 
 ## Startup workflow
 
@@ -27,14 +28,21 @@ the target repo** via the `write_repo_file` tool.
 - Path containment is retained: target paths resolve under `/home/d3/Github` (`resolve_repo`) and
   `RepoWriteTool` rejects paths that escape the resolved repo. This is path safety, not an
   authority gate.
-- No automated secret scanning remains. Keep `op://d3HLPRV/...` as references and avoid plaintext
-  secrets by discipline.
+- No automated secret scanning remains; the secrets rule below is discipline, not an enforced gate.
+
+## Secrets
+
+- Reference every secret only as a `op://d3HLPRV/...` 1Password path. This is the single allowed
+  way to refer to a secret in any prompt, generated file, handoff, output, or log.
+- Never write a plaintext secret value (token, password, key, credential) anywhere, and never
+  resolve, dereference, or expand an `op://d3HLPRV/...` path to its value.
+- In generated Terraform/Ansible, pass secrets through variables and HCP Terraform workspace
+  variable sets that map back to `op://d3HLPRV/...` references — not hardcoded values.
 
 ## Implementation rules
 
 - Use CrewAI Flow plus one sequential Crew first.
 - Terraform owns provisioning. Ansible owns configuration. Bash is glue only. Python is allowed here only for the CrewAI app and deterministic adapters.
-- Preserve `op://d3HLPRV/...` references as references only.
 
 ## Verification
 

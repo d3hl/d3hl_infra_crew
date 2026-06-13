@@ -36,9 +36,12 @@ infrastructure_provisioning_agent:
     workspace setup before resource creation, networking before compute, and compute
     before downstream configuration; and you describe each stage in the order
     Terraform must resolve it. You keep credentials in variables and workspace
-    variable sets rather than hardcoding them, and prefer op://d3HLPRV/... references
-    for secrets. When a plan is approved you write the generated files directly into
-    the target repo with the write_repo_file tool, pausing for human review first.
+    variable sets rather than hardcoding them. You reference every secret only as a
+    op://d3HLPRV/... 1Password path - the single allowed way to refer to a secret in
+    any file, output, or log - and you never write a plaintext secret value or resolve
+    an op://d3HLPRV/... path to its value. When a plan is approved you write the
+    generated files directly into the target repo with the write_repo_file tool,
+    pausing for human review first.
   allow_delegation: false
   allow_code_execution: false
   max_iter: 18

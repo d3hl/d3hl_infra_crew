@@ -11,7 +11,7 @@ A **CrewAI orchestrator** for the d3HL homelab infrastructure repos that drafts 
 There is **no boundary/authority gate**. The old `plan_only` / `live_read_check` / `live_apply_gated` ladder and the `boundary.py` regex policy were removed deliberately so the crew can apply real changes. Consequences to be aware of:
 
 - The crew writes real files into the target repo via the `write_repo_file` tool ([tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)); it can create or overwrite files.
-- There is no automated secret-leak or mutation/teardown scanning. Still keep `op://d3HLPRV/...` as references and avoid plaintext secrets — this is now a discipline, not an enforced gate.
+- There is no automated secret-leak or mutation/teardown scanning. **Secrets rule (discipline, not an enforced gate):** reference every secret only as a `op://d3HLPRV/...` 1Password path — the single allowed way to refer to a secret in any prompt, generated file, handoff, output, or log. Never write a plaintext secret value and never resolve/expand an `op://d3HLPRV/...` path. In generated Terraform/Ansible, pass secrets through variables and workspace variable sets that map back to `op://d3HLPRV/...`, never hardcoded values.
 - The **interactive checkpoint** is the `apply_changes` task's `human_input: true`: the live crew pauses for human review/approval before finalizing writes.
 - The one retained safety is path containment: `resolve_repo()` keeps target paths under `/home/d3/Github` and `RepoWriteTool` rejects paths that escape the resolved repo. This is path-traversal safety, not an authority gate.
 
