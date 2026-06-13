@@ -9,6 +9,8 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "crewai[tools]==1.14.6",
     "pyyaml>=6.0.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
 ]
 
 [project.scripts]
@@ -16,6 +18,7 @@ kickoff = "d3hl_infra_crew.main:kickoff"
 run_crew = "d3hl_infra_crew.main:kickoff"
 plot = "d3hl_infra_crew.main:plot"
 run_with_trigger = "d3hl_infra_crew.main:run_with_trigger"
+serve = "d3hl_infra_crew.api:serve"
 
 [build-system]
 requires = [

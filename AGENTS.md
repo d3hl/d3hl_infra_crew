@@ -41,6 +41,13 @@ the target repo** via the `write_repo_file` tool.
 - `RepoWriteTool` runs `find_plaintext_secrets()` and refuses to write content with a plaintext
   secret. The scan allows `op://` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references.
 
+## HTTP API / Docker
+
+- `serve` (or `docker compose up`) runs a **dry-run-only** FastAPI app ([api.py](src/d3hl_infra_crew/api.py)).
+  `POST /run` returns the rendered handoff and never starts the Crew/LLM or writes into a target repo.
+- It binds `127.0.0.1` by default and the compose workspace mount is read-only, so the container
+  cannot write to the repos. Live, writing runs stay on the CLI where `human_input` can prompt.
+
 ## Implementation rules
 
 - Use CrewAI Flow plus one sequential Crew first.

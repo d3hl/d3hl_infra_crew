@@ -1,0 +1,15 @@
+services:
+  api:
+    build: .
+    image: d3hl-infra-crew
+    # Bind to localhost only — this is a dry-run-only, read-only surface.
+    ports:
+      - "127.0.0.1:8000:8000"
+    # Read-only mount of the workspace so the container can read target-repo state
+    # but cannot write it (consistent with the dry-run-only API).
+    volumes:
+      - /home/d3/Github:/home/d3/Github:ro
+    environment:
+      - D3HL_API_HOST=0.0.0.0
+      - D3HL_API_PORT=8000
+    restart: unless-stopped

@@ -2,7 +2,7 @@
 
 ## Current feature
 
-`CREW-006` - passing.
+`CREW-007` - passing.
 
 ## Verified state
 
@@ -13,6 +13,7 @@
 - Task pipeline is now discover → classify → select → draft → review_candidate_plan → apply_changes; `apply_changes` is interactive (`human_input`).
 - `resolve_repo` workspace containment and a RepoWriteTool path-escape guard are retained as path safety.
 - `CREW-006`: `RepoWriteTool` enforces the secrets rule at write time via `secret_scan.find_plaintext_secrets()` (rejects plaintext secrets; allows op:// and variable/Jinja references). Mutation/teardown remain unguarded by design.
+- `CREW-007`: dry-run-only FastAPI service (`api.py`: `/healthz`, `POST /run`) + `serve` script, Dockerfile, .dockerignore, docker-compose.yml (binds 127.0.0.1, read-only `/home/d3/Github` mount). `/run` reuses collect_repo_state + render_dry_run_handoff; never starts the Crew or writes target repos.
 - LLM-free dry-run path writes `output/infrastructure_handoff.md` and does not write into target repos.
 - 2026-06-13 `./init.sh` passed after `CREW-005`; unit tests include `tests.test_repo_write`.
 - 2026-06-13 grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over `src` and `tests` returned no policy-gate references.
@@ -28,4 +29,4 @@ shared contract (that repo was not edited). Keep `op://d3HLPRV/...` as reference
 
 ## Next step
 
-For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; review the changes at the interactive checkpoint and via the target repo's git status before committing them there. Use `dry_run:true` for an LLM-free, no-write inspection.
+For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; review the changes at the interactive checkpoint and via the target repo's git status before committing them there. Use `dry_run:true` (CLI) or the dry-run-only API (`uv run serve` / `docker compose up`) for an LLM-free, no-write inspection. The live end-to-end write run remains unverified (needs an LLM key); an option B/C API endpoint is the path if unattended/approval-based HTTP writes are ever wanted.

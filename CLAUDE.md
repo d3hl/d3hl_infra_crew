@@ -48,7 +48,23 @@ uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","
 
 `dry_run:true` is the primary way to verify changes without an LLM key. It takes a deterministic code path in `run_with_trigger` (see below) that never starts the CrewAI event loop and never writes into target repos.
 
-Console-script entry points (`pyproject.toml`): `kickoff` / `run_crew` (aliases to the same function), `plot`, `run_with_trigger`.
+Console-script entry points (`pyproject.toml`): `kickoff` / `run_crew` (aliases to the same function), `plot`, `run_with_trigger`, `serve`.
+
+### HTTP API / Docker (dry-run-only)
+
+```bash
+# Serve the dry-run-only API locally (binds 127.0.0.1:8000; override D3HL_API_HOST/PORT)
+uv run serve
+
+# Or containerized — reads the workspace read-only, no LLM key needed
+docker compose up --build
+
+curl localhost:8000/healthz
+curl -X POST localhost:8000/run -H 'content-type: application/json' \
+  -d '{"target_repo":"bootc","infrastructure_request":"plan VM provisioning"}'
+```
+
+The API ([api.py](src/d3hl_infra_crew/api.py)) exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and **never** starts the Crew/LLM or writes into a target repo. Live, writing runs stay on the CLI (`run_with_trigger` without `dry_run`) where the `apply_changes` `human_input` checkpoint can prompt on a TTY. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` **read-only**, so the container physically cannot write to the repos.
 
 ## Architecture
 
@@ -58,6 +74,7 @@ The pipeline is a CrewAI **Flow** (orchestration) wrapping a CrewAI **Crew** (th
 2. **[repo_state.py](src/d3hl_infra_crew/repo_state.py)** — deterministic, LLM-free adapter. `collect_repo_state()` resolves a target repo, reads `feature_list.json` / `claude-progress.md` / git state, selects the active feature (priority order: active → unfinished → blocked → first), and serializes a `RepoStateSnapshot.to_prompt_json()`. `resolve_repo()` enforces that every target path stays under `/home/d3/Github` — a hard security boundary; preserve it.
 3. **[crews/infrastructure_crew/](src/d3hl_infra_crew/crews/infrastructure_crew/)** — `@CrewBase` class wiring three agents and six sequential tasks from YAML. Agents and tasks are defined in `config/agents.yaml` and `config/tasks.yaml`, not in Python; the Python file only binds tools.
 4. **[tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)** — `RepoStateTool` (read target-repo state) and `RepoWriteTool` (`write_repo_file`: write real files into a target repo under `/home/d3/Github`).
+5. **[api.py](src/d3hl_infra_crew/api.py)** — FastAPI app (`serve` script / Docker). `POST /run` reuses `collect_repo_state` + `render_dry_run_handoff`; dry-run-only, never starts the Crew or writes target repos.
 
 **Sequential task pipeline**: `discover_repo_state` → `classify_infra_request` → `select_automation_path` → `draft_candidate_plan` → `review_candidate_plan` → `apply_changes` (interactive: `human_input: true`).
 

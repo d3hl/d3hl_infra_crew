@@ -1,0 +1,10 @@
+.git
+.venv
+output
+__pycache__
+**/__pycache__
+*.pyc
+.agents
+.claude
+tests
+.python-version

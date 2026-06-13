@@ -5,7 +5,8 @@ Last updated: 2026-06-13
 ## Current Verified State
 
 - CrewAI Flow scaffold was created with `crewai create flow d3hl_infra_crew`.
-- `CREW-000` through `CREW-006` are implemented and passing.
+- `CREW-000` through `CREW-007` are implemented and passing.
+- `CREW-007` added a dry-run-only FastAPI service ([api.py](src/d3hl_infra_crew/api.py): `GET /healthz`, `POST /run`) plus a `serve` script, `fastapi`/`uvicorn` deps, `Dockerfile`, `.dockerignore`, and `docker-compose.yml` (binds `127.0.0.1`, mounts `/home/d3/Github` read-only). `/run` reuses `collect_repo_state` + `render_dry_run_handoff`; it never starts the Crew/LLM or writes into a target repo. Live writing runs stay on the CLI where `apply_changes` `human_input` can prompt.
 - `CREW-005` removed the boundary system entirely (boundary.py, the plan_only/live_read_check/live_apply_gated ladder, BoundaryPolicyTool, evaluate_boundary, allowed_boundary) and added `RepoWriteTool` (`write_repo_file`) so the crew writes real files into a target repo under `/home/d3/Github`. The `apply_changes` task is interactive (`human_input`). This is a deliberate, operator-approved reversal of the original plan-only design; it diverges from agent-contract-master's plan-only shared contract.
 - `CREW-006` re-enforces only the secrets rule: `RepoWriteTool` runs `secret_scan.find_plaintext_secrets()` and refuses to write content containing a plaintext secret, while allowing `op://d3HLPRV/...` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references. Mutation/teardown remain unguarded by design.
 - The repo contains one Flow wrapping one sequential infrastructure Crew with three agents: repo state analyst, infrastructure provisioning agent, and QA contract guardian.
@@ -34,6 +35,7 @@ Last updated: 2026-06-13
 - 2026-06-13 LLM-free dry runs for `plan_only`, `live_read_check`, and `live_apply_gated` each wrote `output/infrastructure_handoff.md` with no `Boundary Findings` section: `evaluate_boundary` passed for all three. The `live_apply_gated` handoff documents gated apply (operator-approved apply gate required) and teardown-blocked, and self-validates clean.
 - 2026-06-13 `CREW-005` removed the boundary system: `./init.sh` passed (unit tests include `tests.test_repo_write`); a grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over `src` and `tests` returned no policy-gate references; LLM-free dry runs for bootc and proxmox wrote `output/infrastructure_handoff.md` and left both target repos git-clean.
 - 2026-06-13 `CREW-006` added write-time secret enforcement: `tests.test_secret_scan` and `tests.test_repo_write` passed (11 cases); RepoWriteTool rejects content with a plaintext secret (e.g. `sk-...`) and does not write the file, while allowing op:// and variable references; `./init.sh` passed.
+- 2026-06-13 `CREW-007` added the dry-run-only FastAPI service: `tests.test_api` passed (3 cases: healthz, /run handoff, 400 out-of-workspace); `fastapi==0.136.3` + `uvicorn[standard]` added and `uv.lock` refreshed; `./init.sh` passed with `Dockerfile` as a required file.
 
 ## Blockers / Risks
 
@@ -44,4 +46,4 @@ Last updated: 2026-06-13
 
 ## Recommended Next Step
 
-Use `dry_run:true` to inspect a handoff without an LLM key or any target-repo writes. For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; the `apply_changes` task pauses for human review before writing generated files into the target repo. There is no boundary gate — review changes at the interactive checkpoint and via the target repo's git status before committing them there.
+Use `dry_run:true` (CLI) or the dry-run-only API (`uv run serve` / `docker compose up`, then `POST /run`) to inspect a handoff without an LLM key or any target-repo writes. For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; the `apply_changes` task pauses for human review before writing generated files into the target repo. There is no boundary gate — review changes at the interactive checkpoint and via the target repo's git status. The still-unverified path is a live end-to-end write run (needs an LLM key); a future option B/C API endpoint could expose live runs if unattended/approval-based writes are ever wanted.

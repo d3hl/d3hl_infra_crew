@@ -170,6 +170,29 @@
         "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, full unit-test suite passed, and git diff --check completed."
       ],
       "notes": "Scope is intentionally the secrets rule only; mutation/teardown remain unguarded by design after CREW-005. The scan is conservative to avoid false-positives on variable references; it is not a substitute for human review at the apply_changes checkpoint."
+    },
+    {
+      "id": "CREW-007",
+      "priority": 8,
+      "area": "api",
+      "title": "Deploy the crew as a dry-run-only FastAPI service in Docker",
+      "description": "Add a FastAPI app (src/d3hl_infra_crew/api.py) exposing GET /healthz and POST /run, where /run reuses collect_repo_state + render_dry_run_handoff to return the rendered handoff. Dry-run-only by design: it never starts the Crew/LLM and never writes into a target repo (live, writing runs stay on the CLI where apply_changes human_input can prompt). Add a serve console script, fastapi + uvicorn deps, Dockerfile, .dockerignore, and docker-compose.yml that binds 127.0.0.1 and mounts /home/d3/Github read-only.",
+      "dependencies": [
+        "CREW-006"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds (Dockerfile is a required file; api.py compiles)",
+        "tests.test_api: GET /healthz returns 200, POST /run returns the dry-run handoff, out-of-workspace target_repo returns 400",
+        "uv run serve plus curl /healthz and POST /run returns a handoff with the target repo left git-clean",
+        "docker build / docker compose config validates (or commands documented if Docker is unavailable in the environment)"
+      ],
+      "evidence": [
+        "2026-06-13 fastapi==0.136.3 and uvicorn[standard] added as direct deps; uv.lock refreshed via crewai install (resolved 152 packages).",
+        "2026-06-13 tests.test_api passed (3 cases: healthz, /run dry-run handoff with TF-001, 400 for out-of-workspace target).",
+        "2026-06-13 ./init.sh passed: required files present (incl. Dockerfile), feature_list.json valid, Python compile passed, full unit suite passed, and git diff --check completed."
+      ],
+      "notes": "Dry-run-only scope chosen because apply_changes uses human_input (no TTY in a container) and the boundary gate was removed, so a live HTTP endpoint would mean unattended writes. The read-only workspace mount structurally prevents writes. Live/auto-write (option B) and async-approval (option C) endpoints are intentionally out of scope. No auth added; localhost bind + read-only mount keep exposure to read-only repo-state info."
     }
   ]
 }

@@ -23,6 +23,7 @@ required_files=(
   "init.sh"
   "session-handoff.md"
   "pyproject.toml"
+  "Dockerfile"
 )
 for file in "${required_files[@]}"; do
   test -f "$file"
