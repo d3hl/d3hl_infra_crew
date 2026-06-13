@@ -82,6 +82,11 @@ review_candidate_plan:
     Check for:
     - Terraform used for provisioning and Ansible used for configuration
     - bpg/proxmox provider with a pinned required_providers block for Proxmox
+    - bpg/proxmox `proxmox_virtual_environment_file` using `source_file`/`source_raw`
+      as nested blocks, never as a string argument (`source_file = "..."` is invalid)
+    - cloud-init/user-data variables injected via `templatefile()`, with no
+      unrendered dollar-brace placeholders left in a file uploaded verbatim
+    - no deprecated provider resources or data sources
     - Python/custom API wrappers where Terraform or Ansible should be used
     - each file to write having a clear target-repo-relative path and complete content
     - validation commands and rollback hints that match the proposed changes

@@ -6,6 +6,10 @@ from crewai import Agent, Crew, LLM, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 
+# Applied on import: restores the `human_input: true` checkpoint, which crashes
+# in the pinned CrewAI 1.14.6. Must run before the crew kicks off and builds the
+# experimental AgentExecutor. See d3hl_infra_crew/crewai_compat.py.
+from d3hl_infra_crew import crewai_compat as _crewai_compat  # noqa: F401
 from d3hl_infra_crew.tools import RepoStateTool, RepoWriteTool
 
 
