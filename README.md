@@ -69,10 +69,21 @@ curl -X POST localhost:8000/run -H 'content-type: application/json' \
 
 The API exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and never starts the Crew/LLM or writes into a target repo. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` read-only.
 
+Published image (after merge to `main`): `ghcr.io/d3hl/d3hl_infra_crew:latest`.
+
 ## Verify
 
 ```bash
 ./init.sh
 ```
+
+## CI
+
+GitHub Actions on pull requests and pushes to `main`:
+
+- **static** — installs uv, runs `./init.sh` (compile + unit tests).
+- **docker-publish** — builds the Dockerfile, smoke-tests `GET /healthz`, and pushes to `ghcr.io/<owner>/d3hl_infra_crew:latest` on `main` only (PRs build but do not push).
+
+No repo secrets are required for GHCR publish; the workflow uses `GITHUB_TOKEN` with `packages: write`.
 
 No LLM key is required for local unit tests or dry runs. Running the actual Crew requires an LLM provider key in the environment or ignored `.env` file.

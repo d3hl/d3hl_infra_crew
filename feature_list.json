@@ -196,6 +196,30 @@
         "2026-06-13 container: podman build succeeded; running with -v /home/d3/Github:/home/d3/Github:ro, an in-container request to /healthz returned ok and POST /run (bootc) returned the dry-run handoff (verified from inside the container; host->container port-forward was flaky under rootless podman in WSL, which is an environment quirk, not an app defect)."
       ],
       "notes": "Dry-run-only scope chosen because apply_changes uses human_input (no TTY in a container) and the boundary gate was removed, so a live HTTP endpoint would mean unattended writes. The read-only workspace mount structurally prevents writes. The image installs git (needed by the repo-state adapter) and sets git safe.directory=* for the host-owned mount; run_command was hardened to return returncode 127 instead of raising when a binary is missing. Live/auto-write (option B) and async-approval (option C) endpoints are intentionally out of scope. No auth added; localhost bind + read-only mount keep exposure to read-only repo-state info."
+    },
+    {
+      "id": "CREW-008",
+      "priority": 9,
+      "area": "ci",
+      "title": "Add GitHub Actions static baseline and GHCR Docker publish",
+      "description": "Add GitHub Actions workflows: static job runs setup-uv and ./init.sh on PR/push to main; docker-publish builds the Dockerfile, smoke-tests GET /healthz, and pushes to ghcr.io/<owner>/d3hl_infra_crew on main only.",
+      "dependencies": [
+        "CREW-007"
+      ],
+      "status": "in_progress",
+      "verification": [
+        ".github/workflows/static.yml and docker-publish.yml present",
+        "./init.sh succeeds",
+        "PR workflow builds the image without pushing",
+        "main push publishes ghcr.io/<owner>/d3hl_infra_crew:latest",
+        "docker-publish smoke test returns {\"status\":\"ok\"} from /healthz"
+      ],
+      "evidence": [
+        "2026-06-13 Added .github/workflows/static.yml (setup-uv@v5, Python 3.13, uv sync --frozen, ./init.sh) and .github/workflows/docker-publish.yml (build-push-action@v6, metadata tags latest/0.1.0/sha/pr, GHCR login+push gated to main, /healthz smoke via loaded imageid).",
+        "2026-06-13 Updated docker-compose.yml image tag to ghcr.io/d3hl/d3hl_infra_crew:latest with documented local build fallback; README CI section added.",
+        "2026-06-13 ./init.sh passed from /home/d3/Github/d3hl_infra_crew after CREW-008 workflow additions: 31 unit tests passed."
+      ],
+      "notes": "Implementation complete in repo. GHCR publish and PR build evidence pending first GitHub Actions run after push/merge to main. No repo secrets required; workflow uses GITHUB_TOKEN with packages: write. One-time: set GHCR package visibility after first publish."
     }
   ]
 }

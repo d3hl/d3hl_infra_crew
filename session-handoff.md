@@ -2,7 +2,7 @@
 
 ## Current feature
 
-`CREW-007` - passing.
+`CREW-008` - in progress (workflows implemented; GH Actions evidence pending first push to `main`).
 
 ## Verified state
 
@@ -14,10 +14,9 @@
 - `resolve_repo` workspace containment and a RepoWriteTool path-escape guard are retained as path safety.
 - `CREW-006`: `RepoWriteTool` enforces the secrets rule at write time via `secret_scan.find_plaintext_secrets()` (rejects plaintext secrets; allows op:// and variable/Jinja references). Mutation/teardown remain unguarded by design.
 - `CREW-007`: dry-run-only FastAPI service (`api.py`: `/healthz`, `POST /run`) + `serve` script, Dockerfile, .dockerignore, docker-compose.yml (binds 127.0.0.1, read-only `/home/d3/Github` mount). `/run` reuses collect_repo_state + render_dry_run_handoff; never starts the Crew or writes target repos.
+- `CREW-008`: `.github/workflows/static.yml` (setup-uv + `./init.sh`) and `.github/workflows/docker-publish.yml` (build, `/healthz` smoke, GHCR push on `main` only). `docker-compose.yml` uses `ghcr.io/d3hl/d3hl_infra_crew:latest`.
 - LLM-free dry-run path writes `output/infrastructure_handoff.md` and does not write into target repos.
-- 2026-06-13 `./init.sh` passed after `CREW-005`; unit tests include `tests.test_repo_write`.
-- 2026-06-13 grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over `src` and `tests` returned no policy-gate references.
-- 2026-06-13 dry runs for bootc and proxmox wrote `output/infrastructure_handoff.md` and left both target repos git-clean.
+- 2026-06-13 `./init.sh` passed after CREW-008 workflow additions (31 unit tests).
 
 ## Write mode
 
@@ -29,4 +28,8 @@ shared contract (that repo was not edited). Keep `op://d3HLPRV/...` as reference
 
 ## Next step
 
-For a real write run, set `OPENROUTER_API_KEY` and run `uv run run_with_trigger '{"target_repo":"...","infrastructure_request":"..."}'`; review the changes at the interactive checkpoint and via the target repo's git status before committing them there. Use `dry_run:true` (CLI) or the dry-run-only API (`uv run serve` / `docker compose up`) for an LLM-free, no-write inspection. The live end-to-end write run remains unverified (needs an LLM key); an option B/C API endpoint is the path if unattended/approval-based HTTP writes are ever wanted.
+1. Commit and push CREW-008 to `main` (or open a PR and confirm `static` + `docker-publish` build jobs pass without push).
+2. After merge, confirm `ghcr.io/d3hl/d3hl_infra_crew:latest` exists; append Actions run URL to `feature_list.json` evidence and mark `CREW-008` passing.
+3. One-time: set GHCR package visibility under GitHub Packages.
+
+For day-to-day use: `dry_run:true` (CLI) or `docker compose up` + `POST /run` for LLM-free inspection; set `OPENROUTER_API_KEY` for live write runs via CLI.

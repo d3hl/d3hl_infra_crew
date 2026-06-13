@@ -1,7 +1,8 @@
 services:
   api:
-#    build: .
-    image: ghcr.io/d3hl/d3hl_infra_crew:0.0.0
+    image: ghcr.io/d3hl/d3hl_infra_crew:latest
+    # Local fallback: uncomment build and comment image above.
+    # build: .
     # Bind to localhost only — this is a dry-run-only, read-only surface.
     ports:
       - "127.0.0.1:8000:8000"
