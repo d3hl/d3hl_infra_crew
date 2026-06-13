@@ -4,8 +4,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from d3hl_infra_crew.repo_state import collect_repo_state, select_active_feature
+from d3hl_infra_crew.repo_state import collect_repo_state, run_command, select_active_feature
 from d3hl_infra_crew.tools.repo_tools import RepoStateTool
+
+
+class RunCommandTests(unittest.TestCase):
+    def test_missing_binary_degrades_instead_of_raising(self):
+        result = run_command(["definitely-not-a-real-binary-xyz"], cwd=Path("/tmp"))
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("command not found", result.stderr)
 
 
 class RepoStateTests(unittest.TestCase):

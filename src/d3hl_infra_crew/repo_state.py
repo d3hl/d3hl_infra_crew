@@ -97,15 +97,24 @@ def read_text(path: Path, max_chars: int = 12000) -> str:
 
 
 def run_command(command: list[str], cwd: Path, timeout: int = 300) -> CommandResult:
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-        check=False,
-        env={**os.environ, "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", "/tmp/uv-cache")},
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+            check=False,
+            env={**os.environ, "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", "/tmp/uv-cache")},
+        )
+    except FileNotFoundError:
+        # e.g. git/uv not installed in a minimal container — degrade instead of crashing.
+        return CommandResult(
+            command=" ".join(command),
+            returncode=127,
+            stdout="",
+            stderr=f"command not found: {command[0]}",
+        )
     return CommandResult(
         command=" ".join(command),
         returncode=completed.returncode,

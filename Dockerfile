@@ -7,7 +7,16 @@ ENV UV_CACHE_DIR=/tmp/uv-cache \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     D3HL_API_HOST=0.0.0.0 \
-    D3HL_API_PORT=8000
+    D3HL_API_PORT=8000 \
+    # Treat the read-only, host-owned workspace mount as safe for git.
+    GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=safe.directory \
+    GIT_CONFIG_VALUE_0=*
+
+# git is needed by the repo-state adapter to read target-repo git status/log.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src

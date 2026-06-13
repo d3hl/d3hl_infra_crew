@@ -185,14 +185,17 @@
         "./init.sh succeeds (Dockerfile is a required file; api.py compiles)",
         "tests.test_api: GET /healthz returns 200, POST /run returns the dry-run handoff, out-of-workspace target_repo returns 400",
         "uv run serve plus curl /healthz and POST /run returns a handoff with the target repo left git-clean",
-        "docker build / docker compose config validates (or commands documented if Docker is unavailable in the environment)"
+        "container image builds and serves /healthz + /run with the read-only workspace mount",
+        "run_command degrades (returncode 127) instead of crashing when a binary like git is absent"
       ],
       "evidence": [
         "2026-06-13 fastapi==0.136.3 and uvicorn[standard] added as direct deps; uv.lock refreshed via crewai install (resolved 152 packages).",
-        "2026-06-13 tests.test_api passed (3 cases: healthz, /run dry-run handoff with TF-001, 400 for out-of-workspace target).",
-        "2026-06-13 ./init.sh passed: required files present (incl. Dockerfile), feature_list.json valid, Python compile passed, full unit suite passed, and git diff --check completed."
+        "2026-06-13 tests.test_api passed (3 cases: healthz, /run dry-run handoff with TF-001, 400 for out-of-workspace target); tests.test_repo_state.RunCommandTests added for the missing-binary path. 31 unit tests total.",
+        "2026-06-13 ./init.sh passed: required files present (incl. Dockerfile), feature_list.json valid, Python compile passed, 31 unit tests passed, and git diff --check completed.",
+        "2026-06-13 host smoke: uv run serve + curl /healthz returned ok and POST /run (bootc) returned the dry-run handoff with bootc left git-clean.",
+        "2026-06-13 container: podman build succeeded; running with -v /home/d3/Github:/home/d3/Github:ro, an in-container request to /healthz returned ok and POST /run (bootc) returned the dry-run handoff (verified from inside the container; host->container port-forward was flaky under rootless podman in WSL, which is an environment quirk, not an app defect)."
       ],
-      "notes": "Dry-run-only scope chosen because apply_changes uses human_input (no TTY in a container) and the boundary gate was removed, so a live HTTP endpoint would mean unattended writes. The read-only workspace mount structurally prevents writes. Live/auto-write (option B) and async-approval (option C) endpoints are intentionally out of scope. No auth added; localhost bind + read-only mount keep exposure to read-only repo-state info."
+      "notes": "Dry-run-only scope chosen because apply_changes uses human_input (no TTY in a container) and the boundary gate was removed, so a live HTTP endpoint would mean unattended writes. The read-only workspace mount structurally prevents writes. The image installs git (needed by the repo-state adapter) and sets git safe.directory=* for the host-owned mount; run_command was hardened to return returncode 127 instead of raising when a binary is missing. Live/auto-write (option B) and async-approval (option C) endpoints are intentionally out of scope. No auth added; localhost bind + read-only mount keep exposure to read-only repo-state info."
     }
   ]
 }
