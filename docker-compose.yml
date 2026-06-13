@@ -1,7 +1,7 @@
 services:
   api:
-    build: .
-    image: d3hl-infra-crew
+#    build: .
+    image: ghcr.io/d3hl/d3hl-infra-crew:latest
     # Bind to localhost only — this is a dry-run-only, read-only surface.
     ports:
       - "127.0.0.1:8000:8000"
