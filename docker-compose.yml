@@ -1,6 +1,6 @@
 services:
   api:
-    image: ghcr.io/d3hl/d3hl_infra_crew:latest
+    image: ghcr.io/d3hl/d3hl_infra_crew:sha-471841c
     # Local fallback: uncomment build and comment image above.
     # build: .
     # Bind to localhost only — this is a dry-run-only, read-only surface.
