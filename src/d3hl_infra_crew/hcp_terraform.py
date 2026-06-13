@@ -23,6 +23,25 @@ TERRAFORM_PROVIDER_PREFERENCES = """Terraform provider preferences:
         }
       }
     }
+- bpg/proxmox `proxmox_virtual_environment_file`: `source_file` and `source_raw`
+  are nested blocks, NOT string arguments. `source_file = "path"` is invalid and
+  fails `terraform validate`. Use `source_file { path = "..." }` for a static
+  file, or `source_raw { data = ..., file_name = "..." }` for generated content.
+- Inject variables into cloud-init / user-data with Terraform's `templatefile()`;
+  do not write `${var}`-style placeholders into a YAML file that is uploaded
+  verbatim, because the Proxmox API never renders them. Render the template and
+  upload the result, e.g.
+    source_raw {
+      data      = templatefile("${path.module}/files/user-data.yaml.tftpl", {
+        username       = var.ci_username
+        ssh_public_key = var.ci_ssh_public_key
+      })
+      file_name = "cloud-init-<vm>.yaml"
+    }
+- Before calling Terraform complete, the plan must pass `terraform fmt` and a
+  backend-disabled `terraform validate` against the real provider schema, and
+  must avoid resources or data sources the provider marks deprecated (prefer the
+  replacement the provider names).
 """
 
 
