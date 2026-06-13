@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from d3hl_infra_crew.boundary import evaluate_boundary
-from d3hl_infra_crew.repo_state import collect_repo_state
+from d3hl_infra_crew.repo_state import collect_repo_state, resolve_repo
+from d3hl_infra_crew.secret_scan import find_plaintext_secrets
 
 
 class RepoStateInput(BaseModel):
@@ -29,18 +30,32 @@ class RepoStateTool(BaseTool):
         return collect_repo_state(target_repo, run_static_checks=False).to_prompt_json()
 
 
-class BoundaryInput(BaseModel):
-    text: str = Field(..., description="Candidate handoff or plan to inspect.")
-    allowed_boundary: str = Field(
-        "plan_only",
-        description="Allowed authority boundary. Supported values: plan_only, live_read_check.",
+class RepoWriteInput(BaseModel):
+    target_repo: str = Field(..., description="Repo alias or absolute path under /home/d3/Github.")
+    relative_path: str = Field(..., description="File path within the target repo, e.g. terraform/main.tf.")
+    content: str = Field(..., description="Full file content to write.")
+
+
+class RepoWriteTool(BaseTool):
+    name: str = "write_repo_file"
+    description: str = (
+        "Write a real file into a target repo's working tree under /home/d3/Github. "
+        "Creates parent directories and overwrites existing files. Returns the absolute path written."
     )
+    args_schema: Type[BaseModel] = RepoWriteInput
 
-
-class BoundaryPolicyTool(BaseTool):
-    name: str = "evaluate_plan_boundary"
-    description: str = "Check candidate output for live mutation commands or plaintext secret patterns under the allowed boundary."
-    args_schema: Type[BaseModel] = BoundaryInput
-
-    def _run(self, text: str, allowed_boundary: str = "plan_only") -> str:
-        return evaluate_boundary(text, allowed_boundary=allowed_boundary).to_text()
+    def _run(self, target_repo: str, relative_path: str, content: str) -> str:
+        repo = resolve_repo(target_repo)
+        dest = (repo / relative_path).resolve()
+        if not dest.is_relative_to(repo):
+            return f"rejected: {relative_path} escapes target repo {repo}"
+        secrets = find_plaintext_secrets(content)
+        if secrets:
+            return (
+                f"rejected: possible plaintext secret in content for {relative_path}; "
+                "reference secrets as op://d3HLPRV/... paths instead. Findings: "
+                + "; ".join(secrets)
+            )
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content, encoding="utf-8")
+        return f"wrote {dest}"

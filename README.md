@@ -1,8 +1,8 @@
 # d3hl_infra_crew
 
-This Plan-only CrewAI orchestrator for the d3HL homelab infrastructure repos.
+A CrewAI orchestrator for the d3HL homelab infrastructure repos that drafts and **writes real files into a target repo**.
 
-This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects an HCP Terraform/Ansible automation path, drafts a candidate plan, checks the plan-only boundary, and writes a local handoff under `output/`.
+This repo contains a CrewAI Flow that wraps one sequential infrastructure Crew. It reads target repo harness state, classifies the request through a consolidated infrastructure provisioning agent, selects an HCP Terraform/Ansible automation path, drafts a candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree.
 
 ## Target repos
 
@@ -15,50 +15,23 @@ Default aliases:
 | `proxmox` | `/home/d3/Github/d3hl-managed-proxmox` | Homelab network / Proxmox SDN |
 | `agent-contract` | `/home/d3/Github/agent-contract-master` | Shared contract reference |
 
-Target repos remain authoritative for their own `AGENTS.md`, `feature_list.json`, `claude-progress.md`, `init.sh`, Terraform, and Ansible files.
+## Write mode
 
-## Boundary
+There is no authority/boundary gate. A live crew run writes real files into the target repo via the `write_repo_file` tool, pausing at the `apply_changes` `human_input` checkpoint for review.
 
-Default authority is `plan_only`.
-
-Allowed by default:
-
-- Read target repo files and git state.
-- Generate plan-only HCP Terraform and Ansible guidance.
-- Save local output under `output/`.
-
-Supported boundaries:
-
-- `plan_only`: local repo-state inspection and plan-only handoff generation.
-- `live_read_check`: approved live reads, target repo static checks, credentialed
-  Terraform plan runs, and Ansible check mode only.
-
-Explicitly gated:
-
-- Target repo `./init.sh` execution.
-- HCP Terraform credential setup, remote/speculative runs, or saved plans.
-- Credentialed Terraform or Ansible check mode.
-- Live reads from Proxmox, Satellite, Cloudflare, registries, or network devices.
-
-Not default:
-
-- `terraform apply`.
-- Live Proxmox, Satellite, registry, DNS, tunnel, or network mutation.
-- Plaintext secrets.
-- Target repo state closeout without verified implementation evidence.
+- Path containment is retained: target paths resolve under `/home/d3/Github`, and writes that escape the resolved repo are rejected.
+- The secrets rule is enforced at write time: `RepoWriteTool` refuses to write content with a plaintext secret. Reference every secret only as a `op://d3HLPRV/...` 1Password path; variable/`${...}`/`{{ ... }}` references are allowed.
+- Mutation/teardown commands are not scanned — review changes at the interactive checkpoint and via the target repo's git status.
 
 ## HCP Terraform support
 
-Generated handoffs include HCP Terraform planning guidance without contacting HCP Terraform. The shared support context covers:
+Generated handoffs include HCP Terraform planning guidance without contacting HCP Terraform:
 
 - `terraform { cloud { ... } }` for HCP Terraform remote state and execution, not a backend block.
 - Explicit organization, project, and workspace naming with placeholders until target repos record approved names.
-- Workspace variables and variable sets for provider credentials and deployment inputs.
-- No token values in Terraform files, prompts, generated handoffs, or repo state.
+- Workspace variables and variable sets for provider credentials and deployment inputs; no token values in `.tf` files.
 - `.terraformignore` recommendations for CLI-driven uploads.
-- Static validation only under `plan_only`; credentialed HCP remote runs require
-  explicit approval and at most the `live_read_check` boundary until mutation is
-  separately approved.
+- For Proxmox, the `bpg/proxmox` provider with a pinned `required_providers` block.
 
 ## Run
 
@@ -68,25 +41,33 @@ Install dependencies:
 UV_CACHE_DIR=/tmp/uv-cache crewai install
 ```
 
-Run a plan-only handoff with JSON trigger payload:
+Real crew run (drafts and writes files into the target repo, pausing for human review; needs `OPENROUTER_API_KEY`):
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Design TF-001 Proxmox-first HCP Terraform provisioning","allowed_boundary":"plan_only"}'
+UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Design TF-001 Proxmox-first HCP Terraform provisioning"}'
 ```
 
-The Flow writes the final handoff to `output/infrastructure_handoff.md`.
-
-For an LLM-free dry run of trigger parsing, the repo-state adapter, boundary-safe handoff rendering, and output writing:
+LLM-free dry run (trigger parsing, repo-state adapter, handoff rendering, output writing; no target-repo writes):
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Dry-run active feature handoff","allowed_boundary":"plan_only","dry_run":true}'
+UV_CACHE_DIR=/tmp/uv-cache uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Dry-run active feature handoff","dry_run":true}'
 ```
 
-For an approved read/check-stage dry run:
+## HTTP API / Docker (dry-run-only)
 
 ```bash
-UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'
+# Local (binds 127.0.0.1:8000; override with D3HL_API_HOST / D3HL_API_PORT)
+UV_CACHE_DIR=/tmp/uv-cache uv run serve
+
+# Containerized — reads the workspace read-only, no LLM key needed
+docker compose up --build
+
+curl localhost:8000/healthz
+curl -X POST localhost:8000/run -H 'content-type: application/json' \
+  -d '{"target_repo":"bootc","infrastructure_request":"plan VM provisioning"}'
 ```
+
+The API exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and never starts the Crew/LLM or writes into a target repo. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` read-only.
 
 ## Verify
 
@@ -94,4 +75,4 @@ UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger '{"target_r
 ./init.sh
 ```
 
-No OpenAI or other LLM key is required for local unit tests. Running the actual Crew requires an LLM provider key in the environment or ignored `.env` file.
+No LLM key is required for local unit tests or dry runs. Running the actual Crew requires an LLM provider key in the environment or ignored `.env` file.

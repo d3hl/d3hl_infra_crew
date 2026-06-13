@@ -13,7 +13,8 @@ class YamlConfigTests(unittest.TestCase):
         self.assertIn("repo_state_analyst", agents)
         self.assertIn("infrastructure_provisioning_agent", agents)
         self.assertIn("qa_contract_guardian", agents)
-        self.assertIn("produce_handoff", tasks)
+        self.assertIn("apply_changes", tasks)
+        self.assertNotIn("validate_boundary", tasks)
         self.assertNotIn("terraform_provisioning_architect", agents)
         self.assertNotIn("ansible_configuration_architect", agents)
         self.assertNotIn("platform_lifecycle_specialist", agents)
@@ -37,8 +38,7 @@ class YamlConfigTests(unittest.TestCase):
             "classify_infra_request",
             "select_automation_path",
             "draft_candidate_plan",
-            "validate_boundary",
-            "produce_handoff",
+            "review_candidate_plan",
         ):
             self.assertIn("{hcp_terraform_context}", tasks[task_name]["description"])
 
@@ -49,14 +49,16 @@ class YamlConfigTests(unittest.TestCase):
         for task_name in ("select_automation_path", "draft_candidate_plan"):
             self.assertIn("bpg/proxmox", tasks[task_name]["description"], task_name)
 
-    def test_tasks_describe_live_read_check_boundary(self):
+    def test_apply_task_is_interactive_and_has_no_boundary_language(self):
         root = Path(__file__).resolve().parents[1]
         config_dir = root / "src" / "d3hl_infra_crew" / "crews" / "infrastructure_crew" / "config"
         agents = yaml.safe_load((config_dir / "agents.yaml").read_text(encoding="utf-8"))
         tasks = yaml.safe_load((config_dir / "tasks.yaml").read_text(encoding="utf-8"))
-        self.assertIn("live_read_check", agents["infrastructure_provisioning_agent"]["backstory"])
-        for task_name in ("classify_infra_request", "select_automation_path", "produce_handoff"):
-            self.assertIn("live_read_check", tasks[task_name]["description"], task_name)
+        self.assertTrue(tasks["apply_changes"].get("human_input"))
+        self.assertIn("write_repo_file", tasks["apply_changes"]["description"])
+        combined = yaml.safe_dump(agents) + yaml.safe_dump(tasks)
+        for token in ("plan_only", "live_read_check", "live_apply_gated", "allowed_boundary"):
+            self.assertNotIn(token, combined)
 
 
 if __name__ == "__main__":

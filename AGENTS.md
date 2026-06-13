@@ -1,6 +1,9 @@
 # AGENTS.md - d3hl_infra_crew
 
-CrewAI orchestrator for d3HL infrastructure repos. This repo is application code and keeps its own harness state.
+## What this repo is
+
+A CrewAI orchestrator for the d3HL homelab infrastructure repos that drafts and writes real files into a target repo. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a 
+candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree. The runtime lives here.
 
 ## Startup workflow
 
@@ -11,43 +14,44 @@ CrewAI orchestrator for d3HL infrastructure repos. This repo is application code
 5. Run `./init.sh` before feature work.
 6. Do not stack feature work on a failing baseline.
 
-## Authority boundary
+## Target-repo write mode
 
-Default boundary is `plan_only`.
+There is no authority/boundary gate. The crew drafts changes and **writes real files into
+the target repo** via the `write_repo_file` tool.
 
-Supported boundaries:
-- `plan_only`: local repo-state inspection, plan-only guidance, and local output only.
-- `live_read_check`: first live stage after explicit approval; permits live reads,
-  target repo static checks, credentialed Terraform plans, and Ansible check mode
-  only. It does not permit mutation or target repo state closeout.
+- The live crew run writes generated files into the target repo's working tree; it can create
+  or overwrite files.
+- The interactive checkpoint is the `apply_changes` task's `human_input: true`: the run pauses
+  for human review/approval before writes are finalized.
+- The `dry_run` path is LLM-free and does not write into target repos; it only renders a handoff
+  to `output/`.
+- Path containment is retained: target paths resolve under `/home/d3/Github` (`resolve_repo`) and
+  `RepoWriteTool` rejects paths that escape the resolved repo. This is path safety, not an
+  authority gate.
+- The secrets rule below is enforced at write time by `RepoWriteTool`; there is no mutation/teardown scanning.
 
-Allowed by default:
-- Read repo harness files and git state.
-- Run this repo's local static checks.
-- Generate plan-only Terraform and Ansible guidance.
-- Write local orchestrator output under `output/`.
+## Secrets
 
-Gated by explicit user approval:
-- Running target repo `./init.sh` through the Flow.
-- Credentialed `terraform plan` or Ansible check mode.
-- Live reads against Proxmox, Red Hat Satellite, Cloudflare, registry, or network devices.
+- Reference every secret only as a `op://d3HLPRV/...` 1Password path. This is the single allowed
+  way to refer to a secret in any prompt, generated file, handoff, output, or log.
+- Never write a plaintext secret value (token, password, key, credential) anywhere, and never
+  resolve, dereference, or expand an `op://d3HLPRV/...` path to its value.
+- In generated Terraform/Ansible, pass secrets through variables and HCP Terraform workspace
+  variable sets that map back to `op://d3HLPRV/...` references — not hardcoded values.
+- `RepoWriteTool` runs `find_plaintext_secrets()` and refuses to write content with a plaintext
+  secret. The scan allows `op://` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references.
 
-Not allowed by default:
-- `terraform apply`.
-- Live Proxmox mutation.
-- Satellite lifecycle mutation.
-- Registry/image push.
-- Cloudflare DNS/tunnel mutation.
-- Plaintext secrets in prompts, files, outputs, or logs.
-- Target repo state closeout without verified implementation evidence.
+## HTTP API / Docker
+
+- `serve` (or `docker compose up`) runs a **dry-run-only** FastAPI app ([api.py](src/d3hl_infra_crew/api.py)).
+  `POST /run` returns the rendered handoff and never starts the Crew/LLM or writes into a target repo.
+- It binds `127.0.0.1` by default and the compose workspace mount is read-only, so the container
+  cannot write to the repos. Live, writing runs stay on the CLI where `human_input` can prompt.
 
 ## Implementation rules
 
 - Use CrewAI Flow plus one sequential Crew first.
-- Keep target repos authoritative for their own `AGENTS.md`, `feature_list.json`, `claude-progress.md`, `init.sh`, Terraform, and Ansible files.
-- Do not centralize target repo state in this repo.
 - Terraform owns provisioning. Ansible owns configuration. Bash is glue only. Python is allowed here only for the CrewAI app and deterministic adapters.
-- Preserve `op://d3HLPRV/...` references as references only.
 
 ## Verification
 
@@ -58,3 +62,28 @@ Run:
 ```
 
 The baseline compiles Python, validates YAML/JSON through unit tests, and runs `git diff --check` when inside a git worktree.
+
+## Definition of Done
+
+A feature is `passing` only when all of the following hold:
+
+- Every step in the feature's `verification` array in `feature_list.json` passes.
+- `./init.sh` is green on a clean tree.
+- A dated evidence line (command and outcome) is appended to both the feature's `evidence[]` in `feature_list.json` and `claude-progress.md`.
+
+Do not mark a feature `passing` from inference or a chat summary. `passing_requires_evidence` and `do_not_skip_verification` are enforced rules.
+
+## Scope
+
+One feature at a time. Pick the single highest-priority unfinished feature in `feature_list.json` (`single_active_feature: true`); do not start or stack a second.
+
+Stay in scope: make no edits outside what the active feature needs. Target repos stay authoritative for their own files — do not centralize their state here.
+
+## End of Session
+
+Before ending, leave the tree restartable so the next session resumes from files, not memory:
+
+- Update `claude-progress.md`: Last updated date, Current Verified State, Verification Evidence, and Recommended Next Step.
+- Refresh `session-handoff.md`: current feature, verified state, boundary, and next step.
+- Update the active feature's `status` and `evidence` in `feature_list.json`.
+- Confirm the baseline is green, or record the blocker if it is not.

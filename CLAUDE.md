@@ -4,22 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A **plan-only CrewAI orchestrator** for the d3HL homelab infrastructure repos. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a plan-only candidate, runs a boundary check, and writes a handoff to `output/`. The runtime lives here; the target repos stay authoritative for their own files.
+A **CrewAI orchestrator** for the d3HL homelab infrastructure repos that drafts and **writes real files into a target repo**. It is a CrewAI Flow wrapping one sequential Crew: it reads a target repo's harness state, classifies an infrastructure request, picks a Terraform/Ansible automation path, drafts a candidate, reviews it, and — after human review — writes the generated files into the target repo's working tree. The runtime lives here.
 
-## Authority boundary (read before doing anything)
+## Target-repo write mode (read before doing anything)
 
-Default authority is `plan_only`. This is the central design constraint, enforced both by the agents' prompts and by deterministic regex in [boundary.py](src/d3hl_infra_crew/boundary.py).
+There is **no boundary/authority gate**. The old `plan_only` / `live_read_check` / `live_apply_gated` ladder and the `boundary.py` regex policy were removed deliberately so the crew can apply real changes. Consequences to be aware of:
 
-- **Allowed**: read target repo files/git state, run this repo's local static checks (`./init.sh`), generate plan-only Terraform/Ansible guidance, write under `output/`.
-- **Gated (needs explicit user approval)**: running a *target* repo's `./init.sh` (the `run_static_checks` flag in the trigger payload), credentialed `terraform plan` / Ansible check mode, live reads against Proxmox / Satellite / Cloudflare / registries / network devices.
-- **Never by default**: `terraform apply`/`destroy`, any live infra mutation, plaintext secrets. `op://d3HLPRV/...` strings are kept as references only — never resolve them.
+- The crew writes real files into the target repo via the `write_repo_file` tool ([tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)); it can create or overwrite files.
+- There is no mutation/teardown scanning, but the **secrets rule is enforced at write time**: `RepoWriteTool` runs `find_plaintext_secrets()` ([secret_scan.py](src/d3hl_infra_crew/secret_scan.py)) and refuses to write content containing a plaintext secret. Reference every secret only as a `op://d3HLPRV/...` 1Password path — the single allowed way to refer to a secret in any prompt, generated file, handoff, output, or log. Never write a plaintext secret value and never resolve/expand an `op://d3HLPRV/...` path. In generated Terraform/Ansible, pass secrets through variables and workspace variable sets that map back to `op://d3HLPRV/...`, never hardcoded values. The scan allows `op://` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references.
+- The **interactive checkpoint** is the `apply_changes` task's `human_input: true`: the live crew pauses for human review/approval before finalizing writes.
+- The one retained safety is path containment: `resolve_repo()` keeps target paths under `/home/d3/Github` and `RepoWriteTool` rejects paths that escape the resolved repo. This is path-traversal safety, not an authority gate.
 
-Supported `allowed_boundary` values:
-
-- `plan_only`: default guidance/output mode. Blocks credentialed Terraform planning, Ansible execution other than static syntax checks, live reads, and all mutation.
-- `live_read_check`: first live stage. Allows approved live reads, credential setup, credentialed Terraform planning, and Ansible `--check`; still blocks mutation, pushes, lifecycle changes, and target repo state closeout.
-
-`evaluate_boundary()` scans generated text for live-mutation command patterns and plaintext-secret patterns; a failing check appends "Boundary Findings" to the handoff rather than blocking the write. Do not weaken these patterns to make output pass.
+The `dry_run` path is LLM-free and **does not write into target repos** — it only renders a handoff to `output/` for inspection.
 
 ## Commands
 
@@ -29,32 +25,46 @@ All commands need `UV_CACHE_DIR=/tmp/uv-cache` (the sandbox default; `init.sh` s
 # Install deps
 UV_CACHE_DIR=/tmp/uv-cache crewai install
 
-# Full static baseline: required-files check, python compile, unit tests, git whitespace
+# Full static baseline: required-files check, python compile, unit tests, git whitespace.
 ./init.sh
 
 # Run unit tests directly (no LLM key needed)
 uv run python -m unittest discover -s tests
 
 # Run a single test
-uv run python -m unittest tests.test_boundary
-uv run python -m unittest tests.test_boundary.BoundaryTests.test_<name>
+uv run python -m unittest tests.test_repo_write
+uv run python -m unittest tests.test_yaml_config
 
 # LLM provider (required for live Crew runs only — not needed for dry_run or unit tests)
 # OPENROUTER_API_KEY=<key>   # place in .env (gitignored)
 
-# Real Crew run (requires OPENROUTER_API_KEY in env or .env)
-uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","allowed_boundary":"plan_only"}'
+# Real Crew run — drafts and writes real files into the target repo, pausing for human review
+uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"..."}'
 
-# LLM-free dry run — exercises trigger parsing, repo-state adapter, handoff render, boundary check, output write
-uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","allowed_boundary":"plan_only","dry_run":true}'
-
-# LLM-free read/check-stage dry run after approval
-uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"Read/check live-stage validation","allowed_boundary":"live_read_check","dry_run":true}'
+# LLM-free dry run — exercises trigger parsing, repo-state adapter, handoff render, output write.
+# Does NOT write into the target repo.
+uv run run_with_trigger '{"target_repo":"bootc","infrastructure_request":"...","dry_run":true}'
 ```
 
-`dry_run:true` is the primary way to verify changes without an LLM key. It takes a deterministic code path in `run_with_trigger` (see below) that never starts the CrewAI event loop.
+`dry_run:true` is the primary way to verify changes without an LLM key. It takes a deterministic code path in `run_with_trigger` (see below) that never starts the CrewAI event loop and never writes into target repos.
 
-Console-script entry points (`pyproject.toml`): `kickoff` / `run_crew` (aliases to the same function), `plot`, `run_with_trigger`.
+Console-script entry points (`pyproject.toml`): `kickoff` / `run_crew` (aliases to the same function), `plot`, `run_with_trigger`, `serve`.
+
+### HTTP API / Docker (dry-run-only)
+
+```bash
+# Serve the dry-run-only API locally (binds 127.0.0.1:8000; override D3HL_API_HOST/PORT)
+uv run serve
+
+# Or containerized — reads the workspace read-only, no LLM key needed
+docker compose up --build
+
+curl localhost:8000/healthz
+curl -X POST localhost:8000/run -H 'content-type: application/json' \
+  -d '{"target_repo":"bootc","infrastructure_request":"plan VM provisioning"}'
+```
+
+The API ([api.py](src/d3hl_infra_crew/api.py)) exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and **never** starts the Crew/LLM or writes into a target repo. Live, writing runs stay on the CLI (`run_with_trigger` without `dry_run`) where the `apply_changes` `human_input` checkpoint can prompt on a TTY. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` **read-only**, so the container physically cannot write to the repos.
 
 ## Architecture
 
@@ -63,14 +73,14 @@ The pipeline is a CrewAI **Flow** (orchestration) wrapping a CrewAI **Crew** (th
 1. **[main.py](src/d3hl_infra_crew/main.py)** — `InfrastructureFlow` with four `@listen`-chained steps: `collect_inputs` → `inspect_repo` → `run_infrastructure_crew` → `save_handoff`. State is the `InfrastructureState` pydantic model. Trigger input arrives as `crewai_trigger_payload`.
 2. **[repo_state.py](src/d3hl_infra_crew/repo_state.py)** — deterministic, LLM-free adapter. `collect_repo_state()` resolves a target repo, reads `feature_list.json` / `claude-progress.md` / git state, selects the active feature (priority order: active → unfinished → blocked → first), and serializes a `RepoStateSnapshot.to_prompt_json()`. `resolve_repo()` enforces that every target path stays under `/home/d3/Github` — a hard security boundary; preserve it.
 3. **[crews/infrastructure_crew/](src/d3hl_infra_crew/crews/infrastructure_crew/)** — `@CrewBase` class wiring three agents and six sequential tasks from YAML. Agents and tasks are defined in `config/agents.yaml` and `config/tasks.yaml`, not in Python; the Python file only binds tools.
-4. **[boundary.py](src/d3hl_infra_crew/boundary.py)** — the regex policy gate described above.
-5. **[tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)** — `RepoStateTool` and `BoundaryPolicyTool` expose the two adapters to agents as CrewAI tools.
+4. **[tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)** — `RepoStateTool` (read target-repo state) and `RepoWriteTool` (`write_repo_file`: write real files into a target repo under `/home/d3/Github`).
+5. **[api.py](src/d3hl_infra_crew/api.py)** — FastAPI app (`serve` script / Docker). `POST /run` reuses `collect_repo_state` + `render_dry_run_handoff`; dry-run-only, never starts the Crew or writes target repos.
 
-**Sequential task pipeline**: `discover_repo_state` → `classify_infra_request` → `select_automation_path` → `draft_candidate_plan` → `validate_boundary` → `produce_handoff`.
+**Sequential task pipeline**: `discover_repo_state` → `classify_infra_request` → `select_automation_path` → `draft_candidate_plan` → `review_candidate_plan` → `apply_changes` (interactive: `human_input: true`).
 
-**Agent/tool ownership** (intentional separation — tests assert it): `repo_state_analyst` owns `RepoStateTool`; `infrastructure_provisioning_agent` owns the three planning tasks (`classify_infra_request`, `select_automation_path`, `draft_candidate_plan`) and has *no* tools; `qa_contract_guardian` owns `BoundaryPolicyTool` and the final boundary/handoff tasks.
+**Agent/tool ownership** (intentional separation — tests assert it): `repo_state_analyst` owns `RepoStateTool`; `infrastructure_provisioning_agent` owns the planning tasks plus `apply_changes` and holds `RepoWriteTool`; `qa_contract_guardian` is the change-reviewer (`review_candidate_plan`) and has *no* tools.
 
-**Two execution paths in `run_with_trigger`**: when `dry_run` is true it inlines `collect_repo_state` + `render_dry_run_handoff` + write, fully bypassing CrewAI/the LLM. Otherwise it kicks off the real Flow. `render_dry_run_handoff()` in main.py is the deterministic template used by the dry-run path.
+**Two execution paths in `run_with_trigger`**: when `dry_run` is true it inlines `collect_repo_state` + `render_dry_run_handoff` + write to `output/`, fully bypassing CrewAI/the LLM and never touching target repos. Otherwise it kicks off the real Flow, which runs the Crew and writes generated files into the target repo. `render_dry_run_handoff()` in main.py is the deterministic template used by the dry-run path.
 
 ## Automation-path rules (encoded in tasks.yaml)
 

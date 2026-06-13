@@ -4,8 +4,7 @@
   "rules": {
     "single_active_feature": true,
     "passing_requires_evidence": true,
-    "do_not_skip_verification": true,
-    "default_authority": "plan_only"
+    "do_not_skip_verification": true
   },
   "features": [
     {
@@ -98,6 +97,102 @@
         "2026-06-13 dry run passed: UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy uv run run_with_trigger with target_repo=bootc, allowed_boundary=live_read_check, dry_run=true, and request='Read/check live-stage validation' wrote output/infrastructure_handoff.md with no boundary findings."
       ],
       "notes": "live_read_check is read/check only. It does not permit Terraform apply/destroy, Proxmox mutation, registry push, Cloudflare or Satellite mutation, target repo state closeout, or plaintext secrets."
+    },
+    {
+      "id": "CREW-004",
+      "priority": 5,
+      "area": "boundary",
+      "title": "Add gated-mutation boundary (apply-only)",
+      "description": "Add live_apply_gated as the third boundary rung: approved create/update/apply actions are allowed only when each command carries an explicit operator-approved apply gate, while explicit teardown (terraform/tofu destroy, qm destroy, Proxmox/Satellite/Cloudflare/registry removal) stays blocked at every boundary. Plan_only and live_read_check remain unchanged; plaintext secrets stay prohibited.",
+      "dependencies": [
+        "CREW-003"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "Boundary tests prove gated apply is allowed only with an operator-approved apply gate under live_apply_gated",
+        "Boundary tests prove ungated apply, ungated Ansible converge, and explicit teardown are blocked under live_apply_gated",
+        "Boundary tests prove plaintext secrets remain blocked under live_apply_gated",
+        "LLM-free dry run writes output/infrastructure_handoff.md with allowed_boundary=live_apply_gated and no boundary findings",
+        "plan_only and live_read_check dry runs still pass with no regression"
+      ],
+      "evidence": [
+        "2026-06-13 focused tests passed for tests.test_boundary (18 cases) with UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy, covering gated apply allowed with marker, ungated apply blocked, terraform destroy blocked even with marker, gated/ungated Ansible converge, terraform plan allowed, and plaintext token blocked under live_apply_gated.",
+        "2026-06-13 LLM-free dry runs for plan_only, live_read_check, and live_apply_gated each wrote output/infrastructure_handoff.md with no Boundary Findings section (evaluate_boundary passed).",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, 35 unit tests passed, and git diff --check completed."
+      ],
+      "notes": "Apply-only by design: there is no boundary value that permits an explicit teardown command. A future rung can add gated teardown if automated destroy becomes a real need. The approval gate is a per-command marker (operator-approved / approval gate / approved ... gate), mirroring the existing podman-login gate. Superseded by CREW-005, which removed the boundary system entirely."
+    },
+    {
+      "id": "CREW-005",
+      "priority": 6,
+      "area": "crew",
+      "title": "Remove boundary system; add interactive target-repo write mode",
+      "description": "Remove the boundary gate (boundary.py, the plan_only/live_read_check/live_apply_gated ladder, BoundaryPolicyTool, evaluate_boundary, and allowed_boundary) entirely, and add RepoWriteTool (write_repo_file) so the crew writes real files into a target repo's working tree under /home/d3/Github. The apply_changes task is interactive via human_input. The dry_run path stays LLM-free and does not write into target repos. Path containment in resolve_repo and a path-escape guard in RepoWriteTool are retained as path safety.",
+      "dependencies": [
+        "CREW-004"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated returns nothing meaningful in src and tests",
+        "RepoWriteTool writes a file under a target repo and rejects a path that escapes it",
+        "LLM-free dry runs for bootc and proxmox write output/infrastructure_handoff.md and leave target repos git-clean",
+        "apply_changes task carries human_input and references write_repo_file"
+      ],
+      "evidence": [
+        "2026-06-13 boundary.py and tests/test_boundary.py deleted; BoundaryPolicyTool/evaluate_boundary/allowed_boundary removed from tools, crew, Flow, and YAML; RepoWriteTool added and bound to infrastructure_provisioning_agent.",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, unit tests passed (including tests.test_repo_write), and git diff --check completed.",
+        "2026-06-13 grep -ri for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over src and tests returned no policy-gate references.",
+        "2026-06-13 LLM-free dry runs for bootc and proxmox wrote output/infrastructure_handoff.md; target repos remained git-clean (no files written by dry run)."
+      ],
+      "notes": "Deliberate reversal of the repo's original plan-only design, approved by the operator. No automated secret-leak or mutation/teardown scanning remains. Diverges from agent-contract-master's shared contract (target repos authoritative / plan-only); that repo was not edited. Live interactive write runs require an LLM provider key. Write-time secret enforcement was added in CREW-006."
+    },
+    {
+      "id": "CREW-006",
+      "priority": 7,
+      "area": "crew",
+      "title": "Enforce the op:// secrets rule at write time in RepoWriteTool",
+      "description": "Re-enforce only the secrets rule (no boundary ladder) by scanning content in RepoWriteTool before writing. secret_scan.find_plaintext_secrets flags high-confidence secret shapes (sk-, ghp_, xox, AKIA, PRIVATE KEY blocks) and plaintext values assigned to secret-ish keys, while allowing op://d3HLPRV/... paths and var./local./data./${...}/{{ ... }} references. RepoWriteTool refuses to write when findings are present.",
+      "dependencies": [
+        "CREW-005"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "secret_scan flags high-confidence shapes and plaintext secret-key assignments",
+        "secret_scan allows op:// paths and Terraform/Ansible/Jinja references and clean Terraform",
+        "RepoWriteTool rejects content with a plaintext secret and does not write the file",
+        "RepoWriteTool writes content that references secrets via op:// or variables"
+      ],
+      "evidence": [
+        "2026-06-13 tests.test_secret_scan and tests.test_repo_write passed (11 cases) with UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy, covering high-confidence shapes, compound secret keys (client_secret), op:// and var./Jinja references, clean Terraform, and RepoWriteTool reject/allow paths.",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, full unit-test suite passed, and git diff --check completed."
+      ],
+      "notes": "Scope is intentionally the secrets rule only; mutation/teardown remain unguarded by design after CREW-005. The scan is conservative to avoid false-positives on variable references; it is not a substitute for human review at the apply_changes checkpoint."
+    },
+    {
+      "id": "CREW-007",
+      "priority": 8,
+      "area": "api",
+      "title": "Deploy the crew as a dry-run-only FastAPI service in Docker",
+      "description": "Add a FastAPI app (src/d3hl_infra_crew/api.py) exposing GET /healthz and POST /run, where /run reuses collect_repo_state + render_dry_run_handoff to return the rendered handoff. Dry-run-only by design: it never starts the Crew/LLM and never writes into a target repo (live, writing runs stay on the CLI where apply_changes human_input can prompt). Add a serve console script, fastapi + uvicorn deps, Dockerfile, .dockerignore, and docker-compose.yml that binds 127.0.0.1 and mounts /home/d3/Github read-only.",
+      "dependencies": [
+        "CREW-006"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds (Dockerfile is a required file; api.py compiles)",
+        "tests.test_api: GET /healthz returns 200, POST /run returns the dry-run handoff, out-of-workspace target_repo returns 400",
+        "uv run serve plus curl /healthz and POST /run returns a handoff with the target repo left git-clean",
+        "docker build / docker compose config validates (or commands documented if Docker is unavailable in the environment)"
+      ],
+      "evidence": [
+        "2026-06-13 fastapi==0.136.3 and uvicorn[standard] added as direct deps; uv.lock refreshed via crewai install (resolved 152 packages).",
+        "2026-06-13 tests.test_api passed (3 cases: healthz, /run dry-run handoff with TF-001, 400 for out-of-workspace target).",
+        "2026-06-13 ./init.sh passed: required files present (incl. Dockerfile), feature_list.json valid, Python compile passed, full unit suite passed, and git diff --check completed."
+      ],
+      "notes": "Dry-run-only scope chosen because apply_changes uses human_input (no TTY in a container) and the boundary gate was removed, so a live HTTP endpoint would mean unattended writes. The read-only workspace mount structurally prevents writes. Live/auto-write (option B) and async-approval (option C) endpoints are intentionally out of scope. No auth added; localhost bind + read-only mount keep exposure to read-only repo-state info."
     }
   ]
 }

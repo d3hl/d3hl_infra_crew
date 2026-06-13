@@ -6,9 +6,8 @@ HCP_TERRAFORM_SUPPORT_CONTEXT = """HCP Terraform support context:
 - Keep tokens out of Terraform files. Authentication belongs in operator or workspace credentials after approval, never in repo config or generated handoffs.
 - Put sensitive provider credentials in HCP Terraform workspace environment variables or variable sets. Put non-secret deployment inputs in workspace Terraform variables.
 - Include a `.terraformignore` recommendation when local-only files, generated output, or secrets-adjacent artifacts should be excluded from CLI-driven uploads.
-- Treat HCP Terraform remote runs, speculative runs, saved plans, and applies as credentialed gates outside the default plan_only boundary.
-- Under live_read_check, approved credential setup and plan runs are allowed for evidence collection only; apply, destroy, provisioning mutation, and state closeout remain blocked.
-- Default validation remains local static validation only: formatting checks and backend-disabled initialization/validation where target repos define Terraform files.
+- Run HCP Terraform credential setup and remote runs from the operator environment; keep tokens in workspace or operator credentials rather than in repo config.
+- Validate locally first with formatting checks and backend-disabled initialization/validation where target repos define Terraform files.
 """
 
 TERRAFORM_PROVIDER_PREFERENCES = """Terraform provider preferences:
