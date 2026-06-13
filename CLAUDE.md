@@ -25,7 +25,7 @@ All commands need `UV_CACHE_DIR=/tmp/uv-cache` (the sandbox default; `init.sh` s
 # Install deps
 UV_CACHE_DIR=/tmp/uv-cache crewai install
 
-# Full static baseline: required-files check, python compile, unit tests, git whitespace
+# Full static baseline: required-files check, python compile, unit tests, git whitespace.
 ./init.sh
 
 # Run unit tests directly (no LLM key needed)
