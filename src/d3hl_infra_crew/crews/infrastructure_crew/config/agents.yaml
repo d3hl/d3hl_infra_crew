@@ -45,7 +45,7 @@ infrastructure_provisioning_agent:
   allow_delegation: false
   allow_code_execution: false
   max_iter: 18
-  max_execution_time: 300
+  max_execution_time: 900
 
 qa_contract_guardian:
   role: >
