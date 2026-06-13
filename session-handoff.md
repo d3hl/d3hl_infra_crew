@@ -2,7 +2,7 @@
 
 ## Current feature
 
-`CREW-005` - passing.
+`CREW-006` - passing.
 
 ## Verified state
 
@@ -11,7 +11,8 @@
 - `CREW-005` removed the boundary system entirely (boundary.py, the plan_only/live_read_check/live_apply_gated ladder, BoundaryPolicyTool, evaluate_boundary, allowed_boundary).
 - `RepoWriteTool` (`write_repo_file`) added and bound to the provisioning agent; the crew writes real files into a target repo's working tree under `/home/d3/Github`.
 - Task pipeline is now discover → classify → select → draft → review_candidate_plan → apply_changes; `apply_changes` is interactive (`human_input`).
-- `resolve_repo` workspace containment and a RepoWriteTool path-escape guard are retained as path safety; no automated secret/mutation scanning remains.
+- `resolve_repo` workspace containment and a RepoWriteTool path-escape guard are retained as path safety.
+- `CREW-006`: `RepoWriteTool` enforces the secrets rule at write time via `secret_scan.find_plaintext_secrets()` (rejects plaintext secrets; allows op:// and variable/Jinja references). Mutation/teardown remain unguarded by design.
 - LLM-free dry-run path writes `output/infrastructure_handoff.md` and does not write into target repos.
 - 2026-06-13 `./init.sh` passed after `CREW-005`; unit tests include `tests.test_repo_write`.
 - 2026-06-13 grep for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over `src` and `tests` returned no policy-gate references.

@@ -146,7 +146,30 @@
         "2026-06-13 grep -ri for boundary/allowed_boundary/plan_only/live_read_check/live_apply_gated over src and tests returned no policy-gate references.",
         "2026-06-13 LLM-free dry runs for bootc and proxmox wrote output/infrastructure_handoff.md; target repos remained git-clean (no files written by dry run)."
       ],
-      "notes": "Deliberate reversal of the repo's original plan-only design, approved by the operator. No automated secret-leak or mutation/teardown scanning remains. Diverges from agent-contract-master's shared contract (target repos authoritative / plan-only); that repo was not edited. Live interactive write runs require an LLM provider key."
+      "notes": "Deliberate reversal of the repo's original plan-only design, approved by the operator. No automated secret-leak or mutation/teardown scanning remains. Diverges from agent-contract-master's shared contract (target repos authoritative / plan-only); that repo was not edited. Live interactive write runs require an LLM provider key. Write-time secret enforcement was added in CREW-006."
+    },
+    {
+      "id": "CREW-006",
+      "priority": 7,
+      "area": "crew",
+      "title": "Enforce the op:// secrets rule at write time in RepoWriteTool",
+      "description": "Re-enforce only the secrets rule (no boundary ladder) by scanning content in RepoWriteTool before writing. secret_scan.find_plaintext_secrets flags high-confidence secret shapes (sk-, ghp_, xox, AKIA, PRIVATE KEY blocks) and plaintext values assigned to secret-ish keys, while allowing op://d3HLPRV/... paths and var./local./data./${...}/{{ ... }} references. RepoWriteTool refuses to write when findings are present.",
+      "dependencies": [
+        "CREW-005"
+      ],
+      "status": "passing",
+      "verification": [
+        "./init.sh succeeds",
+        "secret_scan flags high-confidence shapes and plaintext secret-key assignments",
+        "secret_scan allows op:// paths and Terraform/Ansible/Jinja references and clean Terraform",
+        "RepoWriteTool rejects content with a plaintext secret and does not write the file",
+        "RepoWriteTool writes content that references secrets via op:// or variables"
+      ],
+      "evidence": [
+        "2026-06-13 tests.test_secret_scan and tests.test_repo_write passed (11 cases) with UV_CACHE_DIR=/tmp/uv-cache UV_LINK_MODE=copy, covering high-confidence shapes, compound secret keys (client_secret), op:// and var./Jinja references, clean Terraform, and RepoWriteTool reject/allow paths.",
+        "2026-06-13 ./init.sh passed: required files present, feature_list.json valid, Python compile passed, full unit-test suite passed, and git diff --check completed."
+      ],
+      "notes": "Scope is intentionally the secrets rule only; mutation/teardown remain unguarded by design after CREW-005. The scan is conservative to avoid false-positives on variable references; it is not a substitute for human review at the apply_changes checkpoint."
     }
   ]
 }

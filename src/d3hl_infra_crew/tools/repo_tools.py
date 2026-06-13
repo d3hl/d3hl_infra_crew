@@ -7,6 +7,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from d3hl_infra_crew.repo_state import collect_repo_state, resolve_repo
+from d3hl_infra_crew.secret_scan import find_plaintext_secrets
 
 
 class RepoStateInput(BaseModel):
@@ -48,6 +49,13 @@ class RepoWriteTool(BaseTool):
         dest = (repo / relative_path).resolve()
         if not dest.is_relative_to(repo):
             return f"rejected: {relative_path} escapes target repo {repo}"
+        secrets = find_plaintext_secrets(content)
+        if secrets:
+            return (
+                f"rejected: possible plaintext secret in content for {relative_path}; "
+                "reference secrets as op://d3HLPRV/... paths instead. Findings: "
+                + "; ".join(secrets)
+            )
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(content, encoding="utf-8")
         return f"wrote {dest}"

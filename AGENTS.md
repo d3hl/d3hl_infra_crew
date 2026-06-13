@@ -28,7 +28,7 @@ the target repo** via the `write_repo_file` tool.
 - Path containment is retained: target paths resolve under `/home/d3/Github` (`resolve_repo`) and
   `RepoWriteTool` rejects paths that escape the resolved repo. This is path safety, not an
   authority gate.
-- No automated secret scanning remains; the secrets rule below is discipline, not an enforced gate.
+- The secrets rule below is enforced at write time by `RepoWriteTool`; there is no mutation/teardown scanning.
 
 ## Secrets
 
@@ -38,6 +38,8 @@ the target repo** via the `write_repo_file` tool.
   resolve, dereference, or expand an `op://d3HLPRV/...` path to its value.
 - In generated Terraform/Ansible, pass secrets through variables and HCP Terraform workspace
   variable sets that map back to `op://d3HLPRV/...` references — not hardcoded values.
+- `RepoWriteTool` runs `find_plaintext_secrets()` and refuses to write content with a plaintext
+  secret. The scan allows `op://` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references.
 
 ## Implementation rules
 
