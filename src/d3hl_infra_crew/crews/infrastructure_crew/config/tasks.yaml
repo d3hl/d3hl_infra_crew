@@ -101,16 +101,20 @@ apply_changes:
     Apply the reviewed plan to target repo {target_repo} for request:
     {infrastructure_request}
 
-    Write each confirmed file into the target repo with the `write_repo_file` tool,
-    using the file's target-repo-relative path and full content. Pause for human
-    review and approval before writing, and incorporate any requested changes. After
-    writing, summarize exactly which files were created or modified, the validation
+    The plan has already been reviewed and confirmed. Execute the writes now: call
+    the `write_repo_file` tool once for every confirmed file, passing the file's
+    target-repo-relative path and full content. Do NOT wait for approval, do NOT ask
+    questions, and do NOT stop after presenting a draft — your job is to perform the
+    writes, and the task is not complete until every confirmed file has been written.
+    Call the tool for each file before you produce your final answer. After all writes
+    complete, summarize exactly which files were created or modified, the validation
     commands the operator should run next, rollback hints, and remaining blockers.
-    Do not claim a file was written unless the tool confirmed it.
+    List a file under Files Written only if the `write_repo_file` tool returned a
+    `wrote ...` success result for it; if the tool rejected a write, report the
+    rejection instead of claiming success.
   expected_output: >
-    Final markdown summary with these sections: Summary, Files Written (absolute or
-    target-repo-relative paths confirmed by the write tool), Validation Commands,
-    Rollback Hints, Blockers, Next Action.
+    Final markdown summary with these sections: Summary, Files Written (only
+    target-repo-relative or absolute paths the write_repo_file tool confirmed with a
+    success result), Validation Commands, Rollback Hints, Blockers, Next Action.
   agent: infrastructure_provisioning_agent
-  human_input: true
   output_file: output/infrastructure_handoff.md

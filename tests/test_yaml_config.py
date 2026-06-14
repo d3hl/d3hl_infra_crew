@@ -49,12 +49,15 @@ class YamlConfigTests(unittest.TestCase):
         for task_name in ("select_automation_path", "draft_candidate_plan"):
             self.assertIn("bpg/proxmox", tasks[task_name]["description"], task_name)
 
-    def test_apply_task_is_interactive_and_has_no_boundary_language(self):
+    def test_apply_task_writes_headless_and_has_no_boundary_language(self):
         root = Path(__file__).resolve().parents[1]
         config_dir = root / "src" / "d3hl_infra_crew" / "crews" / "infrastructure_crew" / "config"
         agents = yaml.safe_load((config_dir / "agents.yaml").read_text(encoding="utf-8"))
         tasks = yaml.safe_load((config_dir / "tasks.yaml").read_text(encoding="utf-8"))
-        self.assertTrue(tasks["apply_changes"].get("human_input"))
+        # apply_changes must run headless: human_input gates the write behind a TTY
+        # approval pass that never fires in cloud/headless runs, so the files are
+        # never written. The plan is reviewed by review_candidate_plan instead.
+        self.assertFalse(tasks["apply_changes"].get("human_input"))
         self.assertIn("write_repo_file", tasks["apply_changes"]["description"])
         combined = yaml.safe_dump(agents) + yaml.safe_dump(tasks)
         for token in ("plan_only", "live_read_check", "live_apply_gated", "allowed_boundary"):

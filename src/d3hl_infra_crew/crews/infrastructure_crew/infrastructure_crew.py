@@ -6,15 +6,18 @@ from crewai import Agent, Crew, LLM, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 
-# Applied on import: restores the `human_input: true` checkpoint, which crashes
-# in the pinned CrewAI 1.14.6. Must run before the crew kicks off and builds the
-# experimental AgentExecutor. See d3hl_infra_crew/crewai_compat.py.
+# Precautionary: the crew now runs headless (no task sets `human_input: true`,
+# because that gate fires after the agent's answer and only writes on a TTY
+# feedback pass, so cloud/headless runs never wrote anything). This shim makes the
+# `human_input` checkpoint safe to re-enable on the pinned CrewAI 1.14.6, where it
+# otherwise crashes the experimental AgentExecutor. See d3hl_infra_crew/crewai_compat.py.
 from d3hl_infra_crew import crewai_compat as _crewai_compat  # noqa: F401
 from d3hl_infra_crew.tools import RepoStateTool, RepoWriteTool
 
 
 DEFAULT_OPENROUTER_MODEL = "openrouter/deepseek/deepseek-v4-pro"
 DEFAULT_MAX_TOKENS = 4096
+
 
 
 def configured_llm() -> LLM | None:
@@ -31,7 +34,6 @@ def configured_llm() -> LLM | None:
         return None
     max_tokens = int(os.getenv("CREWAI_MAX_TOKENS", str(DEFAULT_MAX_TOKENS)))
     return LLM(model=model, max_tokens=max_tokens)
-
 
 @CrewBase
 class InfrastructureCrew:
@@ -55,7 +57,8 @@ class InfrastructureCrew:
     def infrastructure_provisioning_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["infrastructure_provisioning_agent"],  # type: ignore[index]
-            llm=configured_llm(),
+            # llm=configured_llm(),
+            llm=LLM(model="openrouter/openai/gpt-4.1"),
             tools=[RepoWriteTool()],
         )
 

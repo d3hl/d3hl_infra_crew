@@ -12,7 +12,7 @@ There is **no boundary/authority gate**. The old `plan_only` / `live_read_check`
 
 - The crew writes real files into the target repo via the `write_repo_file` tool ([tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)); it can create or overwrite files.
 - There is no mutation/teardown scanning, but the **secrets rule is enforced at write time**: `RepoWriteTool` runs `find_plaintext_secrets()` ([secret_scan.py](src/d3hl_infra_crew/secret_scan.py)) and refuses to write content containing a plaintext secret. Reference every secret only as a `op://d3HLPRV/...` 1Password path — the single allowed way to refer to a secret in any prompt, generated file, handoff, output, or log. Never write a plaintext secret value and never resolve/expand an `op://d3HLPRV/...` path. In generated Terraform/Ansible, pass secrets through variables and workspace variable sets that map back to `op://d3HLPRV/...`, never hardcoded values. The scan allows `op://` paths and `var.`/`local.`/`data.`/`${...}`/`{{ ... }}` references.
-- The **interactive checkpoint** is the `apply_changes` task's `human_input: true`: the live crew pauses for human review/approval before finalizing writes.
+- **Review happens before the write, not at it.** The crew runs headless: `apply_changes` has no `human_input` gate, so the provisioning agent writes the confirmed files in a single pass. Human/automated review is the `review_candidate_plan` task, which vets the plan before `apply_changes` executes it. (`human_input: true` was removed because it fires *after* the agent's answer and only triggers a write on a TTY-driven feedback pass — in cloud/headless runs that pass never happens, so nothing was ever written.)
 - The one retained safety is path containment: `resolve_repo()` keeps target paths under `/home/d3/Github` and `RepoWriteTool` rejects paths that escape the resolved repo. This is path-traversal safety, not an authority gate.
 
 The `dry_run` path is LLM-free and **does not write into target repos** — it only renders a handoff to `output/` for inspection.
@@ -64,7 +64,7 @@ curl -X POST localhost:8000/run -H 'content-type: application/json' \
   -d '{"target_repo":"bootc","infrastructure_request":"plan VM provisioning"}'
 ```
 
-The API ([api.py](src/d3hl_infra_crew/api.py)) exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and **never** starts the Crew/LLM or writes into a target repo. Live, writing runs stay on the CLI (`run_with_trigger` without `dry_run`) where the `apply_changes` `human_input` checkpoint can prompt on a TTY. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` **read-only**, so the container physically cannot write to the repos.
+The API ([api.py](src/d3hl_infra_crew/api.py)) exposes only the deterministic dry-run path: `POST /run` returns the rendered handoff and **never** starts the Crew/LLM or writes into a target repo. Live, writing runs go through `run_with_trigger` without `dry_run`; `apply_changes` runs headless and writes the reviewed files in one pass, so these runs work on a TTY or in a cloud/headless context. `docker-compose.yml` binds localhost and mounts `/home/d3/Github` **read-only**, so the container physically cannot write to the repos.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ The pipeline is a CrewAI **Flow** (orchestration) wrapping a CrewAI **Crew** (th
 4. **[tools/repo_tools.py](src/d3hl_infra_crew/tools/repo_tools.py)** — `RepoStateTool` (read target-repo state) and `RepoWriteTool` (`write_repo_file`: write real files into a target repo under `/home/d3/Github`).
 5. **[api.py](src/d3hl_infra_crew/api.py)** — FastAPI app (`serve` script / Docker). `POST /run` reuses `collect_repo_state` + `render_dry_run_handoff`; dry-run-only, never starts the Crew or writes target repos.
 
-**Sequential task pipeline**: `discover_repo_state` → `classify_infra_request` → `select_automation_path` → `draft_candidate_plan` → `review_candidate_plan` → `apply_changes` (interactive: `human_input: true`).
+**Sequential task pipeline**: `discover_repo_state` → `classify_infra_request` → `select_automation_path` → `draft_candidate_plan` → `review_candidate_plan` → `apply_changes` (headless: writes the reviewed files via `write_repo_file`, no `human_input` gate).
 
 **Agent/tool ownership** (intentional separation — tests assert it): `repo_state_analyst` owns `RepoStateTool`; `infrastructure_provisioning_agent` owns the planning tasks plus `apply_changes` and holds `RepoWriteTool`; `qa_contract_guardian` is the change-reviewer (`review_candidate_plan`) and has *no* tools.
 
